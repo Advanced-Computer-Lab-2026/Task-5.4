@@ -73,6 +73,7 @@ PORT=4000
 MONGO_URI=mongodb://tasks:pass1234@ac-j3acrgb-shard-00-00.lueesfz.mongodb.net:27017,ac-j3acrgb-shard-00-01.lueesfz.mongodb.net:27017,ac-j3acrgb-shard-00-02.lueesfz.mongodb.net:27017/?ssl=true&replicaSet=atlas-6to6iy-shard-0&authSource=admin&appName=Cluster0
 JWT_SECRET=4a498d90a0f923ae4b3f1f65571ff25985d17e2f3286e8e90383e449f68a40a8
 JWT_EXPIRES_IN=7d
+CSRF_SECRET=<a different long, random secret>
 ```
 
 ## What was added on top of Task 3
@@ -87,8 +88,11 @@ JWT_EXPIRES_IN=7d
   **httpOnly cookie** (`authController.js`), and `middleware/auth.js` reads the token from
   `req.cookies.token`. A `POST /api/auth/logout` route clears the cookie. The browser now sends
   the session automatically on every request — which is exactly the precondition for `CSRF`.
-- `app.js` now mounts `cookie-parser`, `express.urlencoded` (so plain HTML-form bodies are
-  parsed), and CORS with `credentials: true` locked to the client origin.
+- `app.js` mounts `cookie-parser`, `express.urlencoded`, and CORS locked to the client origin.
+- Mutating API requests require a signed, session-bound CSRF token from `GET /api/csrf-token`.
+  Login and registration remain exempt because no authenticated session exists yet. The client
+  adds the token header automatically; maintenance endpoints are limited to 30 requests per
+  client per 15 minutes.
 - Added a new model called **`MaintenanceRequest`** with the attributes: `roomNumber`, `category`,
   `description`, `status`, `author`.
 - Added the **Maintenance controller** with the following routes:
@@ -113,10 +117,8 @@ JWT_EXPIRES_IN=7d
 
 For this you will **not** need Postman — a `CSRF` attack is carried out by a webpage, not a crafted
 API client. The `attacker/` folder is a small, separate Express server that plays the role of a
-malicious site the victim visits. Look through the `Flow.md` Markdown file for the detailed steps
-to simulate both attacks (register a victim, run the attacker server, open its link, and watch a
-maintenance request get silently filed in the victim's name — then click through and watch the same
-page flood the API with requests).
+malicious site the victim visits. Follow [Flow.md](./Flow.md) to verify that its forged write is
+rejected and that its flood eventually receives `429 Too Many Requests`.
 
 Please note that the demo works over `http://localhost` because the attacker's port
 (`localhost:1337`) and the API's port (`localhost:4000`) are the **same site** — a cookie's
@@ -131,42 +133,23 @@ file). After reading the file, read the next section.
 
 <summary>View Task</summary>
 
-The attack in the `Flow.md` file works for two independent reasons.
+The demonstration in `Flow.md` shows two attacks that the application now blocks.
 
-First, the write endpoint `POST /api/maintenance` (`maintenanceController.js` +
-`routes/maintenance.js`) trusts the session cookie **alone**: there is no proof the request
-actually originated from our own app — no anti-`CSRF` token, no check of intent. Since the browser
-attaches that cookie to any cross-site request, any page the victim visits can forge a request in
-their name.
+First, state-changing requests require a signed, session-bound anti-CSRF token in addition to the
+session cookie. `GET /api/csrf-token` issues it to authenticated clients, and `csrf-csrf` rejects
+forged writes without the matching `x-csrf-token` header.
 
-Second, none of the maintenance endpoints place **any limit on how often one client may call
-them**, so the attacker's page can flood `GET /api/maintenance` with unlimited requests and
-exhaust the server — a `DoS`.
+Second, `express-rate-limit` caps each client's maintenance traffic at 30 requests per 15 minutes.
+Excess calls receive `429 Too Many Requests`.
 
-**Fix both.** Make the maintenance feature safe while keeping its legitimate behavior, then re-run
-the attacks in `Flow.md` and confirm they now fail (the forged request should return `403` and
-leave the data unchanged, and the flood should be refused with `429`).
-
-- **CSRF:** issue a secret, per-session **CSRF token** that the attacker's site cannot read or
-  guess; require that token on every state-changing request; leave "safe" `GET` requests and the
-  pre-auth routes (login/register, which run before a session exists) exempt; and echo the token
-  from the client on each write. Use the **`csrf-csrf`** package (the double-submit-cookie pattern;
-  the old `csurf` is deprecated). You are expected to understand **why** `CORS` and `SameSite`
-  cookies do not by themselves close this hole, and to think carefully about which requests need
-  protection and which must stay exempt.
-- **DoS:** throttle the feature so one client cannot flood it. Use the **`express-rate-limit`**
-  package to return `429 Too Many Requests` once a client exceeds a sensible limit in a time
-  window.
-
-A test suite ships with the project. Run it from the project root:
+A test suite is available through the project setup. Run it from the project root:
 
 ```bash
 npm install     # first time only
 npm test
 ```
 
-The `CSRF` and `DoS` tests describe the **secure** behavior and are **expected to FAIL** in this
-project (the suite is red). Your job is to make them green by applying the fix.
+The CSRF and DoS tests verify the protections above and should pass.
 
 ### Custom Configurations
 
