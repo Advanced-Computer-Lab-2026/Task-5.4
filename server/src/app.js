@@ -6,6 +6,7 @@ import authRoutes from './routes/auth.js';
 import bookingRoutes from './routes/bookings.js';
 import userRoutes from './routes/users.js';
 import maintenanceRoutes from './routes/maintenance.js';
+import { csrfProtection, csrfTokenHandler } from './middleware/csrf.js';
 
 const app = express();
 
@@ -20,6 +21,13 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
+
+// Anti-CSRF: the client fetches a token here, then echoes it in the
+// `x-csrf-token` header on every write. The check below runs on every
+// state-changing request (POST/PATCH/PUT/DELETE) across the whole API;
+// GET/HEAD/OPTIONS and the pre-auth login/register routes are exempt.
+app.get('/api/csrf-token', csrfTokenHandler);
+app.use(csrfProtection);
 
 app.use('/api/auth', authRoutes);
 app.use('/api/bookings', bookingRoutes);
