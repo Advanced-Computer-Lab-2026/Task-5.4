@@ -166,3 +166,4 @@ Notes:
   downloads a small `mongod` binary, so you need **internet access the first time** (cached after).
 - You need **Node.js 18+ (20 recommended)**.
 - The same `npm test` works on **Windows, macOS, and Linux**.
+ **ADLY
