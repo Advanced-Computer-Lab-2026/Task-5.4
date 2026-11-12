@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import Joi from 'joi';
@@ -5,6 +6,8 @@ import { User } from '../models/User.js';
 
 // How long the auth cookie lives, in ms (mirrors JWT_EXPIRES_IN's default of 7d).
 const COOKIE_MAX_AGE = 7 * 24 * 60 * 60 * 1000;
+const CSRF_COOKIE_MAX_AGE = 60 * 60 * 1000;
+const CSRF_COOKIE_NAME = 'csrfToken';
 
 // The session token is stored in an httpOnly cookie so client JS can never read
 // it (good against XSS token theft) — but the browser sends it automatically,
@@ -16,6 +19,17 @@ function setAuthCookie(res, token) {
     secure: false, // true in production (HTTPS only)
     maxAge: COOKIE_MAX_AGE
   });
+}
+
+export function setCsrfCookie(res, token = crypto.randomBytes(32).toString('hex')) {
+  res.cookie(CSRF_COOKIE_NAME, token, {
+    httpOnly: false,
+    sameSite: 'lax',
+    secure: false,
+    maxAge: CSRF_COOKIE_MAX_AGE,
+    path: '/'
+  });
+  return token;
 }
 
 const registerSchema = Joi.object({
@@ -37,6 +51,7 @@ export async function register(req, res, next) {
     const user = await User.create({ name: value.name, email: value.email, password });
     const token = signToken(user);
     setAuthCookie(res, token);
+    setCsrfCookie(res);
     res.status(201).json({ user: publicUser(user) });
   } catch (err) { next(err); }
 }
@@ -60,6 +75,7 @@ export async function login(req, res, next) {
 
     const token = signToken(user);
     setAuthCookie(res, token);
+    setCsrfCookie(res);
     res.json({ user: publicUser(user) });
   } catch (err) { next(err); }
 }
@@ -67,6 +83,7 @@ export async function login(req, res, next) {
 // POST /api/auth/logout
 export async function logout(req, res) {
   res.clearCookie('token');
+  res.clearCookie('csrfToken');
   res.json({ ok: true });
 }
 
@@ -74,6 +91,7 @@ export async function logout(req, res) {
 export async function me(req, res, next) {
   try {
     const user = await User.findById(req.user.id).lean();
+    setCsrfCookie(res);
     res.json({ user: user && publicUser(user) });
   } catch (err) { next(err); }
 }

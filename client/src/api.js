@@ -1,10 +1,28 @@
 import axios from 'axios'
 
-// `withCredentials: true` makes the browser send the httpOnly auth cookie on
-// every request to the API — including requests triggered by a different site.
-// That convenience is exactly what leaves this app open to CSRF: there is no
-// second proof that a state-changing request actually came from our own UI.
+function getCsrfToken() {
+  return document.cookie
+    .split('; ')
+    .find(row => row.startsWith('csrfToken='))
+    ?.split('=')[1]
+}
+
 export const api = axios.create({
   baseURL: 'http://localhost:4000/api',
   withCredentials: true
+})
+
+api.interceptors.request.use(config => {
+  const method = config.method?.toLowerCase()
+  if (method && ['post', 'patch', 'put', 'delete'].includes(method)) {
+    const csrfToken = getCsrfToken()
+    if (csrfToken) {
+      config.headers = {
+        ...config.headers,
+        'X-CSRF-Token': csrfToken
+      }
+    }
+  }
+
+  return config
 })

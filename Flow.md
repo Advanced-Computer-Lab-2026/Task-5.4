@@ -144,25 +144,18 @@ refused with `429`. The solution project does this with the `csrf-csrf` and
 
 ## 6. Running the tests locally
 
-A test suite ships with the project. Run it from the **project root**:
+A test suite covers the maintenance route's CSRF checks and rate limit, plus the
+client's CSRF header interceptor. Run it from the **project root**:
 
 ```bash
 npm install     # first time only
 npm test
 ```
 
-What to expect **in this vulnerable project**:
-
-- The tests describe the **secure** behavior the feature *should* have: a forged request with
-  no CSRF token is rejected (server), a flood is throttled to `429` (server), and the client
-  attaches a CSRF token to mutating requests (client).
-- So here they are **expected to FAIL** (the suite is red). That red result is the starting
-  point — your job is to make them green by adding CSRF protection and rate limiting. The
-  solution project shows them all passing.
-
-Notes:
-
-- The server tests spin up an **in-memory MongoDB** via `mongodb-memory-server`. The first run
-  downloads a small `mongod` binary, so you need **internet access the first time** (cached after).
+- The tests use mocked authentication and maintenance handlers, so they do not need a database.
+- The CSRF tests verify that missing or mismatched tokens are rejected, matching tokens are
+  accepted, and safe `GET` requests remain available.
+- The rate-limit test verifies that excessive maintenance requests receive `429`.
+- The client test verifies that the CSRF cookie is sent as a header on mutating requests.
 - You need **Node.js 18+ (20 recommended)**.
 - The same `npm test` works on **Windows, macOS, and Linux**.

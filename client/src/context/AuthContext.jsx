@@ -19,11 +19,13 @@ export function AuthProvider({ children }) {
   const login = useCallback(async (email, password) => {
     // The server sets the auth cookie in its response; nothing to store here.
     const res = await api.post('/auth/login', { email, password })
+    await api.get('/auth/csrf-token')
     setUser(res.data.user)
   }, [])
 
   const register = useCallback(async (name, email, password) => {
     const res = await api.post('/auth/register', { name, email, password })
+    await api.get('/auth/csrf-token')
     setUser(res.data.user)
   }, [])
 

@@ -158,15 +158,18 @@ leave the data unchanged, and the flood should be refused with `429`).
   package to return `429 Too Many Requests` once a client exceeds a sensible limit in a time
   window.
 
-A test suite ships with the project. Run it from the project root:
+A test suite covers the maintenance route's CSRF checks and rate limit, plus the
+client's CSRF header interceptor. Run it from the project root:
 
 ```bash
 npm install     # first time only
 npm test
 ```
 
-The `CSRF` and `DoS` tests describe the **secure** behavior and are **expected to FAIL** in this
-project (the suite is red). Your job is to make them green by applying the fix.
+The tests use mocked authentication and maintenance handlers, so they do not need a database.
+They verify that invalid CSRF requests are rejected, valid tokens are accepted, safe `GET`
+requests remain available, excessive maintenance requests receive `429`, and the client sends
+the CSRF header on mutating requests.
 
 ### Custom Configurations
 
