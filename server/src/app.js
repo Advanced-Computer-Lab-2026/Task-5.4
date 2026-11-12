@@ -34,7 +34,7 @@ const { generateToken, doubleCsrfProtection } = doubleCsrf({
 });
 
 // Client fetches this once on boot, then sends the value as x-csrf-token header
-app.get('/api/csrf-token', (req, res) => {
+app.get('/api/csrf-token', doubleCsrfProtection, (req, res) => {
   res.json({ csrfToken: generateToken(req, res) });
 });
 
