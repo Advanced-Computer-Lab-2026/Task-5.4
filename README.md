@@ -60,6 +60,67 @@ can.
 
 ## Running it
 
+### Implemented security fixes: run and verify
+
+Use Node.js 20.19+ (Node 24 also works). In PowerShell, start in this folder:
+
+```powershell
+cd "C:\Users\nourm\Desktop\Projects\ACL Task 5\Task-5.4"
+npm install
+# Only if server/.env does not already exist:
+Copy-Item server/.env.example server/.env
+```
+
+Edit `server/.env`: supply a reachable MongoDB URI and separate random
+`JWT_SECRET` and `CSRF_SECRET` values. The example uses a local MongoDB server.
+Then run:
+
+```powershell
+npm run dev
+```
+
+Open http://localhost:5175, register or log in, and file a maintenance request.
+The API runs on http://localhost:4000. Login/register need no CSRF token;
+the client automatically fetches one for each write, including logout.
+
+Run automated checks from this same folder:
+
+```powershell
+npm run test:prepare   # first time: download/cache the MongoDB test binary
+npm test -- --runInBand
+npm run build --workspace client
+```
+
+For security middleware and client checks without downloading MongoDB, run
+`npm run test:security`. These use the real application middleware with database
+calls stubbed; the full suite above also checks real database persistence.
+
+Tests use an isolated temporary MongoDB, without reading your `server/.env` or
+using your application database. The first server-test run requires internet
+access to download MongoDB. Tests/configuration are included directly; opening
+VS Code or running its configuration generators is unnecessary.
+
+To replay `Flow.md`, start the app, log in and file a legitimate request. In a
+second terminal:
+
+```powershell
+cd attacker
+npm install
+npm start
+```
+
+Visit http://localhost:1337 in the logged-in browser. In DevTools Network, the
+hidden forged POST should return **403**; refresh Maintenance and confirm no
+`Forged by attacker via CSRF` entry was added. Click **Claim my prize**: after
+the shared budget of **30 maintenance requests per IP per minute**, requests
+return **429**. Browser scripts cannot read these responses because of CORS;
+inspect Network or the API terminal. Wait one minute before testing legitimate
+maintenance requests again. Reads and writes share the same budget.
+
+See [SECURITY-NOTES.md](SECURITY-NOTES.md) for the startup configuration finding
+to report to your TA, the fixes, and deployment considerations. The original
+assignment context follows below.
+
 ```bash
 npm install           # Install concurrently and the dependencies of the projects
 npm run install:all   # For safety
