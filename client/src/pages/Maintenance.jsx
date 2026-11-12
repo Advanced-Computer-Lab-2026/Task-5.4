@@ -16,7 +16,9 @@ export default function Maintenance() {
     setRequests(res.data.requests)
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    load().catch(err => setError(err?.response?.data?.message || 'Could not load requests'))
+  }, [])
 
   function handleChange(e) {
     setForm({ ...form, [e.target.name]: e.target.value })

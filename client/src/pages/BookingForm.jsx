@@ -22,13 +22,13 @@ export default function BookingForm() {
 
     const load = async () => {
       try {
-        const { data } = await api.get(`/bookings/${id}`);
+        const { data: { booking } } = await api.get(`/bookings/${id}`);
         setForm({
-          roomNumber: data.roomNumber || '',
+          roomNumber: booking.roomNumber || '',
           // Server sends ISO strings; date inputs need YYYY-MM-DD
-          startDate: data.startDate ? data.startDate.slice(0, 10) : '',
-          endDate: data.endDate ? data.endDate.slice(0, 10) : '',
-          purpose: data.purpose || '',
+          startDate: booking.startDate ? booking.startDate.slice(0, 10) : '',
+          endDate: booking.endDate ? booking.endDate.slice(0, 10) : '',
+          purpose: booking.purpose || '',
         });
       } catch (err) {
         setError(err.response?.data?.message || 'Failed to load booking');

@@ -6,6 +6,8 @@ import authRoutes from './routes/auth.js';
 import bookingRoutes from './routes/bookings.js';
 import userRoutes from './routes/users.js';
 import maintenanceRoutes from './routes/maintenance.js';
+import { requireAuth } from './middleware/auth.js';
+import { generateCsrfToken, doubleCsrfProtection } from './middleware/csrf.js';
 
 const app = express();
 
@@ -20,10 +22,14 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
+app.get('/api/csrf-token', requireAuth, (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.json({ csrfToken: generateCsrfToken(req, res) });
+});
 
 app.use('/api/auth', authRoutes);
-app.use('/api/bookings', bookingRoutes);
-app.use('/api/users', userRoutes);
+app.use('/api/bookings', doubleCsrfProtection, bookingRoutes);
+app.use('/api/users', doubleCsrfProtection, userRoutes);
 app.use('/api/maintenance', maintenanceRoutes);
 
 // Not found
@@ -33,6 +39,9 @@ app.use((req, res) => {
 
 // Error handler
 app.use((err, req, res, next) => {
+  if (err.code === 'EBADCSRFTOKEN') {
+    return res.status(403).json({ message: 'Invalid or missing CSRF token', code: err.code });
+  }
   console.error(err);
   res.status(err.status || 500).json({ message: err.message || 'Server Error' });
 });

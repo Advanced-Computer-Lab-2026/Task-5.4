@@ -17,7 +17,9 @@ export default function Bookings() {
     setBookings(res.data.bookings)
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    load().catch(err => setError(err?.response?.data?.message || 'Could not load bookings'))
+  }, [])
 
   async function onCancel(id) {
     setError('')
