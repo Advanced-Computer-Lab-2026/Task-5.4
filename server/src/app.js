@@ -6,6 +6,8 @@ import authRoutes from './routes/auth.js';
 import bookingRoutes from './routes/bookings.js';
 import userRoutes from './routes/users.js';
 import maintenanceRoutes from './routes/maintenance.js';
+import { doubleCsrfProtection, csrfToken } from './middleware/csrf.js';
+import { maintenanceLimiter } from './middleware/rateLimit.js';
 
 const app = express();
 
@@ -21,6 +23,16 @@ app.use(cookieParser());
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 
+// DoS: throttle the maintenance feature per client. Mounted before the CSRF
+// check so a flood of forged writes is counted (and refused) too.
+app.use('/api/maintenance', maintenanceLimiter);
+
+// CSRF: the client fetches a token here, then echoes it in `x-csrf-token`.
+app.get('/api/csrf-token', csrfToken);
+// Every state-changing request below must carry a valid token. GET/HEAD/OPTIONS
+// and the pre-auth login/register routes are exempt (see middleware/csrf.js).
+app.use(doubleCsrfProtection);
+
 app.use('/api/auth', authRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/users', userRoutes);
@@ -33,6 +45,10 @@ app.use((req, res) => {
 
 // Error handler
 app.use((err, req, res, next) => {
+  // A missing/invalid CSRF token is an expected refusal, not a server fault.
+  if (err.code === 'EBADCSRFTOKEN') {
+    return res.status(403).json({ message: 'Invalid or missing CSRF token', code: err.code });
+  }
   console.error(err);
   res.status(err.status || 500).json({ message: err.message || 'Server Error' });
 });
