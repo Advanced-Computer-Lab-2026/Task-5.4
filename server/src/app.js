@@ -2,6 +2,8 @@ import express from 'express';
 import morgan from 'morgan';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
+import { requireAuth } from './middleware/auth.js';
+import { issueCsrfToken, protectFromCsrf } from './middleware/csrf.js';
 import authRoutes from './routes/auth.js';
 import bookingRoutes from './routes/bookings.js';
 import userRoutes from './routes/users.js';
@@ -20,6 +22,13 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
+// The legitimate client reads the token from this authenticated endpoint and
+// echoes it in a custom header. A third-party page cannot read this response.
+app.get('/api/csrf-token', requireAuth, issueCsrfToken);
+
+// Protect every state-changing API route, with explicit pre-auth exceptions
+// for login and registration. Safe methods remain available without a token.
+app.use(protectFromCsrf);
 
 app.use('/api/auth', authRoutes);
 app.use('/api/bookings', bookingRoutes);
