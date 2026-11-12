@@ -1,6 +1,7 @@
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import Joi from 'joi';
+import { randomUUID } from 'node:crypto';
 import { User } from '../models/User.js';
 
 // How long the auth cookie lives, in ms (mirrors JWT_EXPIRES_IN's default of 7d).
@@ -13,7 +14,7 @@ function setAuthCookie(res, token) {
   res.cookie('token', token, {
     httpOnly: true,
     sameSite: 'lax',
-    secure: false, // true in production (HTTPS only)
+    secure: process.env.NODE_ENV === 'production',
     maxAge: COOKIE_MAX_AGE
   });
 }
@@ -79,7 +80,7 @@ export async function me(req, res, next) {
 }
 
 function signToken(user) {
-  const payload = { id: user._id.toString(), name: user.name };
+  const payload = { id: user._id.toString(), name: user.name, jti: randomUUID() };
   return jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '7d' });
 }
 
