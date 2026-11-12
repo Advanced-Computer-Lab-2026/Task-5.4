@@ -94,14 +94,22 @@ line(`- Session check \`GET /api/auth/me\` with cookie → **${me.status}** → 
 line('');
 
 // A legitimate request, exactly what the secured client sends: it first
-// fetches an anti-CSRF token, then echoes it in the x-csrf-token header.
+// fetches an anti-CSRF token (which also sets the csrfToken cookie — a browser
+// would store it), then echoes the token in the x-csrf-token header and lets
+// the browser attach BOTH cookies.
 const tokenRes = await fire(`${API}/api/csrf-token`, { headers: { Cookie: victimCookie } });
-let csrfTok = null;
-try { csrfTok = JSON.parse(tokenRes.bodyText).csrfToken; } catch {}
+let csrfTok = null, csrfCookiePair = '';
+try {
+  csrfTok = JSON.parse(tokenRes.bodyText).csrfToken;
+  const setCookie = tokenRes.headers.get('set-cookie') || '';
+  const pair = setCookie.split(',').map((p) => p.trim()).find((p) => p.startsWith('csrfToken='));
+  if (pair) csrfCookiePair = pair.split(';')[0];
+} catch {}
+const legitCookies = [victimCookie, csrfCookiePair].filter(Boolean).join('; ');
 const legit = await fire(`${API}/api/maintenance`, {
   method: 'POST',
   headers: {
-    'Content-Type': 'application/json', Cookie: victimCookie, Origin: 'http://localhost:5175',
+    'Content-Type': 'application/json', Cookie: legitCookies, Origin: 'http://localhost:5175',
     ...(csrfTok ? { 'x-csrf-token': csrfTok } : {})
   },
   body: JSON.stringify({ roomNumber: 'B2-104', category: 'plumbing', description: 'Leaking tap (legitimate click)' })
@@ -208,17 +216,22 @@ line('');
 // ---------------------------------------------------------------------------
 const csrfBreached = csrf.ok && forgedConfirmed;
 const dosBreached = flood1.rateLimited === 0 && flood2.rateLimited === 0;
+const refusedTotal = flood1.rateLimited + flood2.rateLimited;
 line('---');
 line('');
 line('## Verdict');
 line('');
 line(`| Attack | Endpoint | Result |`);
 line(`|---|---|---|`);
-line(`| CSRF (forged form POST, cookie-only auth) | \`POST /api/maintenance\` | ${csrfBreached ? `**BREACHED ✅** — forged record filed in the victim's name` : 'blocked'} |`);
-line(`| DoS (flood, no rate limiting) | \`GET /api/maintenance\` | ${dosBreached ? `**BREACHED ✅** — ${300 + 1500} requests all served, 0 refused` : 'throttled'} |`);
+line(`| CSRF (forged form POST, cookie-only auth) | \`POST /api/maintenance\` | ${csrfBreached ? `**BREACHED ✅** — forged record filed in the victim's name` : `**BLOCKED 🔒** — refused with ${csrf.status}, no record written${legit.ok ? ` (legitimate click with CSRF token: ${legit.status} — happy path intact)` : ''}`} |`);
+line(`| DoS (flood, rate limiting) | \`GET /api/maintenance\` | ${dosBreached ? `**BREACHED ✅** — ${300 + 1500} requests all served, 0 refused` : `**THROTTLED 🔒** — ${refusedTotal} of ${300 + 1500} flood requests refused with 429`} |`);
 line('');
-line('- Neither CORS, nor the `SameSite=Lax` cookie, nor the httpOnly flag stopped the CSRF write.');
-line('- No endpoint ever returned `429`; a single client could keep this up indefinitely.');
+line(csrfBreached
+  ? '- Neither CORS, nor the `SameSite=Lax` cookie, nor the httpOnly flag stopped the CSRF write.'
+  : '- The double-submit anti-CSRF token is what the attacker cannot forge: the cookie rides along, but the `x-csrf-token` header cannot be set by a cross-site form.');
+line(dosBreached
+  ? '- No endpoint ever returned `429`; a single client could keep this up indefinitely.'
+  : '- Rate limiting is active: beyond the per-window allowance the flood is refused with `429`.');
 line('- Simulation ran against the real Express app on an in-memory MongoDB; nothing persists.');
 
 console.log('\n=== SIMULATION DONE ===');
