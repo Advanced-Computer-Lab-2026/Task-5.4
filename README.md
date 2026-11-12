@@ -173,3 +173,49 @@ project (the suite is red). Your job is to make them green by applying the fix.
 Sometimes when working in teams, the team may have custom configurations (like automatic tasks) that run immediately after booting up VSCode. The reason these automatic tasks run on startup is because of a folder called `.vscode`; this folder store custom configurations for VSCode and it is normally present on the C-Drive, assuming a Windows user. However, that folder can also be present in project directories, like the one you are currently using. Before cloning any GitHub Repository that has automatic takes or custom configurations in general you should always verify these configurations before cloning, since they might contain malicious code that targets your machine. For example, I could have a backdoor open that periodically queries my server, attacker server, and I could, at any point, send a command that shuts down your PC, among other options. The second part of this task for you is to find the piece of code that is creating the dialog box issue and inform your TA afterwards.
 
 </details>
+
+## CSRF implementation
+
+Authenticated API writes require the `x-csrf-token` header and matching signed
+CSRF cookie. Obtain the token through authenticated `GET /api/csrf-token`.
+GET/HEAD/OPTIONS and POST login/register are exempt. The frontend handles token
+fetching and session changes automatically. Set `CSRF_SECRET` to a long random
+secret shared by server instances; development otherwise uses a process-local
+random secret. Production cookies require HTTPS.
+
+Run the focused, database-independent CSRF checks with:
+
+```bash
+node --test tests/csrf.test.mjs
+```
+
+## Maintenance rate limiting
+
+All `/api/maintenance` endpoints share a limit of **30 requests per client IP
+per 60 seconds**, including reads and writes. Excess requests return JSON with
+status `429`, rate-limit headers, and `Retry-After`. The limiter runs before
+body parsing, authentication, and database access.
+
+The default in-memory store is suitable for this single-server assignment.
+Multiple server instances would need a shared store to share the same budget.
+
+Run both focused security suites with:
+
+```bash
+node --test tests/csrf.test.mjs tests/rate-limit.test.mjs
+```
+
+## Test configuration
+
+`npm test` runs the original six assignment tests across three Jest suites:
+server CSRF, server rate limiting, and client CSRF. Jest uses separate Node and
+jsdom environments with Babel for ES-module source. These test files and configs
+are checked in directly; no VS Code startup scripts are needed.
+
+The server suites use a temporary MongoDB instance, not the application database.
+They use `MONGOMS_SYSTEM_BINARY` when supplied, or an existing Windows MongoDB 8.2
+installation if found. Otherwise their first run downloads the MongoDB binary
+and needs network access.
+
+`npm run test:focused` runs the five additional database-independent checks using
+Node's test runner. Jest intentionally excludes these `.mjs` files.

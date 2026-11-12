@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react'
-import { api } from '../api'
+import { api, clearCsrfToken, fetchCsrfToken } from '../api'
 
 const AuthContext = createContext(null)
 
@@ -11,7 +11,10 @@ export function AuthProvider({ children }) {
   // localStorage anymore — the browser holds the cookie and sends it on /auth/me.
   useEffect(() => {
     api.get('/auth/me')
-      .then(res => setUser(res.data.user || null))
+      .then(async res => {
+        if (res.data.user) await fetchCsrfToken()
+        setUser(res.data.user || null)
+      })
       .catch(() => setUser(null))
       .finally(() => setLoading(false))
   }, [])
@@ -19,17 +22,22 @@ export function AuthProvider({ children }) {
   const login = useCallback(async (email, password) => {
     // The server sets the auth cookie in its response; nothing to store here.
     const res = await api.post('/auth/login', { email, password })
+    clearCsrfToken()
+    await fetchCsrfToken()
     setUser(res.data.user)
   }, [])
 
   const register = useCallback(async (name, email, password) => {
     const res = await api.post('/auth/register', { name, email, password })
+    clearCsrfToken()
+    await fetchCsrfToken()
     setUser(res.data.user)
   }, [])
 
   const logout = useCallback(async () => {
     // Ask the server to clear the auth cookie, then reset local state.
-    try { await api.post('/auth/logout') } catch { /* ignore */ }
+    await api.post('/auth/logout')
+    clearCsrfToken()
     setUser(null)
     window.location.href = '/login'
   }, [])
