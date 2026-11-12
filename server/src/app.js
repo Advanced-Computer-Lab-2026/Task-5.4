@@ -6,6 +6,8 @@ import authRoutes from './routes/auth.js';
 import bookingRoutes from './routes/bookings.js';
 import userRoutes from './routes/users.js';
 import maintenanceRoutes from './routes/maintenance.js';
+import { csrfProtection, csrfTokenHandler } from './middleware/csrf.js';
+import { maintenanceLimiter } from './middleware/rateLimit.js';
 
 const app = express();
 
@@ -19,7 +21,15 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
+// DoS: rate-limit every maintenance request (counted before anything else runs).
+app.use('/api/maintenance', maintenanceLimiter);
+
+// CSRF: every state-changing request (POST/PUT/PATCH/DELETE) must carry a valid
+// token in the x-csrf-token header; GET/HEAD/OPTIONS and login/register are exempt.
+app.use(csrfProtection);
+
 app.get('/api/health', (req, res) => res.json({ ok: true }));
+app.get('/api/csrf-token', csrfTokenHandler);
 
 app.use('/api/auth', authRoutes);
 app.use('/api/bookings', bookingRoutes);
@@ -33,6 +43,10 @@ app.use((req, res) => {
 
 // Error handler
 app.use((err, req, res, next) => {
+  // Forged / tokenless state-changing request rejected by the CSRF middleware.
+  if (err.code === 'EBADCSRFTOKEN') {
+    return res.status(403).json({ message: 'Invalid or missing CSRF token', code: 'EBADCSRFTOKEN' });
+  }
   console.error(err);
   res.status(err.status || 500).json({ message: err.message || 'Server Error' });
 });

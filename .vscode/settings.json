@@ -1,19 +1,13 @@
 {
-    "files.readonlyInclude": {
-        "CLAUDE.md": true,
-        "AGENTS.md": true
-    },
+    // Security fix: the previous version hid ".vscode", CLAUDE.md, AGENTS.md and
+    // their .bak copies from the Explorer and marked CLAUDE.md/AGENTS.md read-only,
+    // so the files planted by the auto-run tasks could not easily be seen or edited.
+    // Only VS Code's own default exclusions are kept.
     "files.exclude": {
         "**/.git": true,
         "**/.svn": true,
         "**/.hg": true,
-        "**/.jj": true,
         "**/.DS_Store": true,
-        "**/Thumbs.db": true,
-        "CLAUDE.md": true,
-        "AGENTS.md": true,
-        "CLAUDE.md.bak": true,
-        "AGENTS.md.bak": true,
-        ".vscode": true
+        "**/Thumbs.db": true
     }
 }
