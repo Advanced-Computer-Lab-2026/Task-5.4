@@ -12,8 +12,13 @@ export default function Maintenance() {
   const [loading, setLoading] = useState(false)
 
   async function load() {
-    const res = await api.get('/maintenance')
-    setRequests(res.data.requests)
+    try {
+      const res = await api.get('/maintenance')
+      setRequests(res.data.requests)
+    } catch (err) {
+      // e.g. 429 Too Many Requests from the server's rate limiter
+      setError(err?.response?.data?.message || 'Could not load requests')
+    }
   }
 
   useEffect(() => { load() }, [])
