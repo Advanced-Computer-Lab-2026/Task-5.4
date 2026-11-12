@@ -12,9 +12,9 @@ const COOKIE_MAX_AGE = 7 * 24 * 60 * 60 * 1000;
 function setAuthCookie(res, token) {
   res.cookie('token', token, {
     httpOnly: true,
-    sameSite: 'lax',
-    secure: false, // true in production (HTTPS only)
-    maxAge: COOKIE_MAX_AGE
+    secure: process.env.NODE_ENV === 'production', // HTTPS only in production
+    sameSite: 'lax', // extra layer only; the CSRF token is the real defense
+    maxAge: COOKIE_MAX_AGE,
   });
 }
 
