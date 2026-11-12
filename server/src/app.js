@@ -6,6 +6,7 @@ import authRoutes from './routes/auth.js';
 import bookingRoutes from './routes/bookings.js';
 import userRoutes from './routes/users.js';
 import maintenanceRoutes from './routes/maintenance.js';
+import { doubleCsrfProtection, generateCsrfToken } from './middleware/csrf.js';
 
 const app = express();
 
@@ -18,6 +19,12 @@ app.use(express.json());
 // which needs no JavaScript and triggers no CORS preflight) is understood.
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
+
+// CSRF: hand the client a token (bound to its session) and require it, in the
+// x-csrf-token header, on every state-changing request. Must come after
+// cookieParser and before the routers.
+app.get('/api/csrf-token', (req, res) => res.json({ csrfToken: generateCsrfToken(req, res) }));
+app.use(doubleCsrfProtection);
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 
@@ -33,6 +40,7 @@ app.use((req, res) => {
 
 // Error handler
 app.use((err, req, res, next) => {
+  if (err.code === 'EBADCSRFTOKEN') return res.status(403).json({ message: 'Invalid or missing CSRF token' });
   console.error(err);
   res.status(err.status || 500).json({ message: err.message || 'Server Error' });
 });

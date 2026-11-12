@@ -1,0 +1,57 @@
+
+> test
+> jest
+
+[0mGET /api/maintenance [32m200[0m 15.448 ms - 15[0m
+[0mGET /api/maintenance [32m200[0m 3.788 ms - 15[0m
+[0mGET /api/maintenance [32m200[0m 2.021 ms - 15[0m
+[0mGET /api/maintenance [32m200[0m 5.896 ms - 15[0m
+[0mGET /api/maintenance [32m200[0m 1.914 ms - 15[0m
+[0mGET /api/maintenance [32m200[0m 1.584 ms - 15[0m
+[0mGET /api/maintenance [32m200[0m 1.309 ms - 15[0m
+[0mGET /api/maintenance [32m200[0m 1.364 ms - 15[0m
+[0mGET /api/maintenance [32m200[0m 1.477 ms - 15[0m
+[0mGET /api/maintenance [32m200[0m 1.385 ms - 15[0m
+[0mGET /api/maintenance [32m200[0m 1.380 ms - 15[0m
+[0mGET /api/maintenance [32m200[0m 1.651 ms - 15[0m
+[0mGET /api/maintenance [32m200[0m 1.420 ms - 15[0m
+[0mGET /api/maintenance [32m200[0m 1.631 ms - 15[0m
+[0mGET /api/maintenance [32m200[0m 2.373 ms - 15[0m
+[0mGET /api/maintenance [32m200[0m 1.426 ms - 15[0m
+[0mPOST /api/auth/register [32m201[0m 97.252 ms - 99[0m
+[0mGET /api/maintenance [32m200[0m 2.177 ms - 15[0m
+[0mGET /api/maintenance [32m200[0m 1.370 ms - 15[0m
+[0mGET /api/csrf-token [32m200[0m 0.768 ms - 145[0m
+[0mGET /api/maintenance [32m200[0m 1.393 ms - 15[0m
+[0mGET /api/maintenance [32m200[0m 1.862 ms - 15[0m
+[0mPOST /api/maintenance [32m201[0m 4.473 ms - 256[0m
+[0mGET /api/maintenance [33m429[0m 0.372 ms - 50[0m
+[0mGET /api/maintenance [33m429[0m 0.165 ms - 50[0m
+[0mGET /api/maintenance [33m429[0m 0.194 ms - 50[0m
+[0mGET /api/maintenance [33m429[0m 0.192 ms - 50[0m
+[0mGET /api/maintenance [33m429[0m 0.174 ms - 50[0m
+[0mGET /api/maintenance [33m429[0m 0.198 ms - 50[0m
+[0mGET /api/maintenance [33m429[0m 0.165 ms - 50[0m
+[0mGET /api/maintenance [33m429[0m 0.159 ms - 50[0m
+[0mGET /api/maintenance [33m429[0m 0.166 ms - 50[0m
+[0mGET /api/maintenance [33m429[0m 0.134 ms - 50[0m
+[0mGET /api/maintenance [33m429[0m 0.132 ms - 50[0m
+[0mGET /api/maintenance [33m429[0m 0.171 ms - 50[0m
+[0mGET /api/maintenance [33m429[0m 0.188 ms - 50[0m
+[0mGET /api/maintenance [33m429[0m 0.215 ms - 50[0m
+[0mGET /api/maintenance [33m429[0m 0.168 ms - 50[0m
+[0mGET /api/maintenance [33m429[0m 0.169 ms - 50[0m
+[0mGET /api/maintenance [33m429[0m 0.165 ms - 50[0m
+[0mGET /api/maintenance [33m429[0m 0.134 ms - 50[0m
+[0mGET /api/maintenance [33m429[0m 0.183 ms - 50[0m
+[0mGET /api/maintenance [33m429[0m 0.237 ms - 50[0m
+[0mGET /api/maintenance [33m429[0m 0.185 ms - 50[0m
+[0mPOST /api/auth/register [32m201[0m 63.836 ms - 99[0m
+[0mPOST /api/maintenance [33m403[0m 0.452 ms - 43[0m
+[0mGET /api/maintenance [32m200[0m 12.356 ms - 324[0m
+
+Test Suites: 3 passed, 3 total
+Tests:       6 passed, 6 total
+Snapshots:   0 total
+Time:        3.935 s
+Ran all test suites in 2 projects.

@@ -1,0 +1,109 @@
+
+> test
+> jest
+
+FAIL client tests/client/csrf.test.js
+  ● client api CSRF behavior › a mutating request carries the x-csrf-token header
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "test-token"
+    Received: undefined
+
+    [0m [90m 36 |[39m     [36mconst[39m sent [33m=[39m captured[33m.[39mfind((c) [33m=>[39m (c[33m.[39murl [33m||[39m [32m''[39m)[33m.[39mincludes([32m'/maintenance'[39m))[33m;[39m
+     [90m 37 |[39m     expect(sent)[33m.[39mtoBeDefined()[33m;[39m
+    [31m[1m>[22m[39m[90m 38 |[39m     expect(getHeader(sent[33m.[39mheaders[33m,[39m [32m'x-csrf-token'[39m))[33m.[39mtoBe([32m'test-token'[39m)[33m;[39m
+     [90m    |[39m                                                     [31m[1m^[22m[39m
+     [90m 39 |[39m   })[33m;[39m
+     [90m 40 |[39m })[33m;[39m
+     [90m 41 |[39m[0m
+
+      at Object.toBe (tests/client/csrf.test.js:38:53)
+
+[0mGET /api/maintenance [32m200[0m 14.361 ms - 15[0m
+[0mGET /api/maintenance [32m200[0m 3.141 ms - 15[0m
+[0mGET /api/maintenance [32m200[0m 1.736 ms - 15[0m
+[0mGET /api/maintenance [32m200[0m 1.666 ms - 15[0m
+[0mGET /api/maintenance [32m200[0m 1.828 ms - 15[0m
+[0mGET /api/maintenance [32m200[0m 2.211 ms - 15[0m
+[0mGET /api/maintenance [32m200[0m 1.797 ms - 15[0m
+[0mGET /api/maintenance [32m200[0m 1.813 ms - 15[0m
+[0mGET /api/maintenance [32m200[0m 2.705 ms - 15[0m
+[0mGET /api/maintenance [32m200[0m 1.845 ms - 15[0m
+[0mGET /api/maintenance [32m200[0m 1.663 ms - 15[0m
+[0mGET /api/maintenance [32m200[0m 1.452 ms - 15[0m
+[0mGET /api/maintenance [32m200[0m 1.454 ms - 15[0m
+[0mGET /api/maintenance [32m200[0m 1.490 ms - 15[0m
+[0mGET /api/maintenance [32m200[0m 1.612 ms - 15[0m
+[0mGET /api/maintenance [32m200[0m 1.570 ms - 15[0m
+[0mGET /api/maintenance [32m200[0m 1.649 ms - 15[0m
+[0mPOST /api/auth/register [32m201[0m 101.415 ms - 99[0m
+[0mGET /api/maintenance [32m200[0m 1.503 ms - 15[0m
+[0mGET /api/maintenance [32m200[0m 1.573 ms - 15[0m
+[0mGET /api/csrf-token [33m404[0m 0.506 ms - 23[0m
+[0mGET /api/maintenance [32m200[0m 1.744 ms - 15[0m
+[0mGET /api/maintenance [32m200[0m 1.636 ms - 15[0m
+[0mPOST /api/maintenance [32m201[0m 4.274 ms - 256[0m
+[0mGET /api/maintenance [32m200[0m 1.637 ms - 15[0m
+[0mGET /api/maintenance [32m200[0m 1.751 ms - 15[0m
+[0mGET /api/maintenance [32m200[0m 1.402 ms - 15[0m
+[0mGET /api/maintenance [32m200[0m 1.369 ms - 15[0m
+[0mGET /api/maintenance [32m200[0m 1.458 ms - 15[0m
+[0mGET /api/maintenance [32m200[0m 1.359 ms - 15[0m
+[0mGET /api/maintenance [32m200[0m 1.334 ms - 15[0m
+[0mGET /api/maintenance [32m200[0m 1.281 ms - 15[0m
+[0mGET /api/maintenance [32m200[0m 1.347 ms - 15[0m
+[0mGET /api/maintenance [32m200[0m 1.449 ms - 15[0m
+[0mGET /api/maintenance [32m200[0m 1.498 ms - 15[0m
+[0mGET /api/maintenance [32m200[0m 1.596 ms - 15[0m
+[0mGET /api/maintenance [32m200[0m 1.477 ms - 15[0m
+[0mGET /api/maintenance [32m200[0m 1.524 ms - 15[0m
+[0mGET /api/maintenance [32m200[0m 1.318 ms - 15[0m
+[0mGET /api/maintenance [32m200[0m 1.386 ms - 15[0m
+[0mGET /api/maintenance [32m200[0m 1.542 ms - 15[0m
+[0mPOST /api/auth/register [32m201[0m 60.346 ms - 99[0m
+[0mGET /api/maintenance [32m200[0m 1.577 ms - 15[0m
+[0mPOST /api/maintenance [32m201[0m 2.813 ms - 269[0m
+[0mGET /api/maintenance [32m200[0m 1.655 ms - 15[0m
+[0mGET /api/maintenance [32m200[0m 2.191 ms - 15[0m
+FAIL server tests/server/csrf.test.js
+  ● Maintenance requests — CSRF protection › a forged cross-site request with no CSRF token is rejected
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: 403
+    Received: 201
+
+    [0m [90m 73 |[39m
+     [90m 74 |[39m     [90m// Secure behavior: refuse the request for lack of a valid CSRF token.[39m
+    [31m[1m>[22m[39m[90m 75 |[39m     expect(forged[33m.[39mstatus)[33m.[39mtoBe([35m403[39m)[33m;[39m
+     [90m    |[39m                           [31m[1m^[22m[39m
+     [90m 76 |[39m
+     [90m 77 |[39m     [90m// And no forged request must have been written to the database.[39m
+     [90m 78 |[39m     [36mconst[39m list [33m=[39m [36mawait[39m request(app)[33m.[39m[36mget[39m([32m'/api/maintenance'[39m)[33m;[39m[0m
+
+      at Object.toBe (tests/server/csrf.test.js:75:27)
+
+FAIL server tests/server/dos.test.js
+  ● Maintenance requests — DoS / rate limiting › a flood of requests from one client is rate-limited
+
+    expect(received).toContain(expected) // indexOf
+
+    Expected value: 429
+    Received array: [200, 200, 200, 200, 200, 200, 200, 200, 200, 200, …]
+
+    [0m [90m 39 |[39m     expect(statuses)[33m.[39mtoContain([35m200[39m)[33m;[39m
+     [90m 40 |[39m     [90m// ...but the flood is throttled with 429 Too Many Requests.[39m
+    [31m[1m>[22m[39m[90m 41 |[39m     expect(statuses)[33m.[39mtoContain([35m429[39m)[33m;[39m
+     [90m    |[39m                      [31m[1m^[22m[39m
+     [90m 42 |[39m   })[33m;[39m
+     [90m 43 |[39m })[33m;[39m
+     [90m 44 |[39m[0m
+
+      at Object.toContain (tests/server/dos.test.js:41:22)
+
+Test Suites: 3 failed, 3 total
+Tests:       3 failed, 3 passed, 6 total
+Snapshots:   0 total
+Time:        2.735 s, estimated 3 s
+Ran all test suites in 2 projects.
