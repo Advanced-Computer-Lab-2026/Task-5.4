@@ -12,7 +12,10 @@ const COOKIE_MAX_AGE = 7 * 24 * 60 * 60 * 1000;
 function setAuthCookie(res, token) {
   res.cookie('token', token, {
     httpOnly: true,
-    sameSite: 'lax',
+    // Strict: never sent on cross-site requests. An extra layer only — the
+    // attacker on localhost:1337 counts as the SAME site, so the CSRF token
+    // is still the real defense.
+    sameSite: 'strict',
     secure: false, // true in production (HTTPS only)
     maxAge: COOKIE_MAX_AGE
   });
