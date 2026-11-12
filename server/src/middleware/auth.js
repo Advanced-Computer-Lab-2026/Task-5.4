@@ -1,17 +1,17 @@
 import jwt from 'jsonwebtoken';
+import { createHash } from 'node:crypto';
+import { doubleCsrfProtection } from './csrf.js';
 
 export function requireAuth(req, res, next) {
-  // The JWT now rides in an httpOnly cookie instead of the Authorization header.
-  // The browser attaches it automatically on every request to this origin —
-  // which is exactly what makes cross-site request forgery (CSRF) possible.
   const token = req.cookies?.token;
   if (!token) return res.status(401).json({ message: 'Missing token' });
-
   try {
-    const payload = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = payload;
-    return next();
+    req.user = jwt.verify(token, process.env.JWT_SECRET);
+    // Bind to the verified JWT, never just to the account ID. Hashing also
+    // supports existing JWTs issued before the addition of random jti values.
+    req.authSessionId = createHash('sha256').update(token).digest('hex');
   } catch (err) {
     return res.status(401).json({ message: 'Invalid or expired token' });
   }
+  return doubleCsrfProtection(req, res, next);
 }
