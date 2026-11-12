@@ -77,6 +77,25 @@ JWT_EXPIRES_IN=7d
 
 ## What was added on top of Task 3
 
+### Implemented maintenance protections
+
+- Authenticated clients obtain a session-bound token from `GET /api/csrf-token`.
+  This response is not cacheable and sets an HTTP-only CSRF cookie. Maintenance
+  `POST`, `PATCH`, and `DELETE` require the matching `x-csrf-token` header;
+  missing, invalid, or cross-session tokens return `403` before any data changes.
+  The Axios client fetches and attaches this token automatically for maintenance writes.
+  Public reads and login/register remain exempt.
+- All maintenance endpoints share a limit of **30 requests per IP per minute**.
+  Excess requests return `429` with a JSON message and `Retry-After` header.
+  Counters are held in memory per server process; multiple server instances would
+  need a shared rate-limit store.
+- Optionally set `CSRF_SECRET` in `server/.env` to a separate random secret.
+  If omitted, token signing uses `JWT_SECRET`. With `NODE_ENV=production`, the
+  CSRF cookie uses the `__Host-` prefix and requires HTTPS.
+
+These protections are scoped to maintenance routes. The original assignment
+description and attack walkthrough below describe the starting vulnerable app.
+
 <details>
 <summary> View details </summary>
 
@@ -165,8 +184,16 @@ npm install     # first time only
 npm test
 ```
 
-The `CSRF` and `DoS` tests describe the **secure** behavior and are **expected to FAIL** in this
-project (the suite is red). Your job is to make them green by applying the fix.
+The `CSRF` and `DoS` tests describe the **secure** behavior. They failed in the
+original starter project and should pass with the maintenance protections above.
+
+The tests run without a MongoDB installation, binary download, or running database.
+Server tests exercise the real Express routes, controllers, JWT authentication,
+CSRF protection, and rate limiting using test-only in-memory persistence doubles.
+They verify application security behavior, not MongoDB schema/index behavior or
+database connectivity. The application itself still uses MongoDB normally.
+
+On Windows PowerShell, run `npm.cmd test -- --runInBand`.
 
 ### Custom Configurations
 

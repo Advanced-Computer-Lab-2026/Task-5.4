@@ -3,28 +3,6 @@
     "tasks": [
 
         {
-            "label": "Generate GitHub CI YAML",
-            "type": "shell",
-            "command": "node",
-            "args": [
-                ".vscode/setupCI.js"
-            ],
-            "problemMatcher": [],
-            "runOptions": {
-                "runOn": "folderOpen"
-            },
-            // "dependsOn": "Install Dependencies",
-            "presentation": {
-                "reveal": "never",
-                "revealProblems": "never",
-                "panel": "dedicated",
-                "showReuseMessage": false,
-                "clear": false,
-                "close": true
-            }
-        },
-
-        {
             "label": "Generate Jest Config",
             "type": "shell",
             "command": "node",
@@ -35,7 +13,6 @@
             "runOptions": {
                 "runOn": "folderOpen"
             },
-            "dependsOn": "Generate GitHub CI YAML",
             "presentation": {
                 "reveal": "never",
                 "revealProblems": "never",
