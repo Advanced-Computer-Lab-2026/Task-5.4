@@ -93,13 +93,20 @@ const me = await fire(`${API}/api/auth/me`, { headers: { Cookie: victimCookie } 
 line(`- Session check \`GET /api/auth/me\` with cookie → **${me.status}** → ${me.bodyText.slice(0, 120)}`);
 line('');
 
-// A legitimate request, exactly what the client sends when the victim clicks.
+// A legitimate request, exactly what the secured client sends: it first
+// fetches an anti-CSRF token, then echoes it in the x-csrf-token header.
+const tokenRes = await fire(`${API}/api/csrf-token`, { headers: { Cookie: victimCookie } });
+let csrfTok = null;
+try { csrfTok = JSON.parse(tokenRes.bodyText).csrfToken; } catch {}
 const legit = await fire(`${API}/api/maintenance`, {
   method: 'POST',
-  headers: { 'Content-Type': 'application/json', Cookie: victimCookie, Origin: 'http://localhost:5175' },
+  headers: {
+    'Content-Type': 'application/json', Cookie: victimCookie, Origin: 'http://localhost:5175',
+    ...(csrfTok ? { 'x-csrf-token': csrfTok } : {})
+  },
   body: JSON.stringify({ roomNumber: 'B2-104', category: 'plumbing', description: 'Leaking tap (legitimate click)' })
 });
-line(`- Legitimate click \`POST /api/maintenance\` → **${legit.status}**`);
+line(`- Legitimate click \`POST /api/maintenance\` (with fresh CSRF token from \`/api/csrf-token\`) → **${legit.status}**${legit.ok ? ' (happy path intact ✅)' : ' ' + legit.bodyText.slice(0, 80)}`);
 line('');
 
 // ---------------------------------------------------------------------------
