@@ -6,6 +6,7 @@ import authRoutes from './routes/auth.js';
 import bookingRoutes from './routes/bookings.js';
 import userRoutes from './routes/users.js';
 import maintenanceRoutes from './routes/maintenance.js';
+import { csrfTokenHandler, doubleCsrfProtection } from './middleware/csrf.js';
 
 const app = express();
 
@@ -20,6 +21,13 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
+
+// CSRF: hand out a per-session token, then require it on every state-changing
+// request (POST/PUT/PATCH/DELETE). GET/HEAD/OPTIONS and the pre-auth routes
+// (login/register) are exempt — see middleware/csrf.js.
+// Must come after cookieParser (it reads the CSRF + auth cookies).
+app.get('/api/csrf-token', csrfTokenHandler);
+app.use(doubleCsrfProtection);
 
 app.use('/api/auth', authRoutes);
 app.use('/api/bookings', bookingRoutes);

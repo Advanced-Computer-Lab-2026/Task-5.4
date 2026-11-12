@@ -1,7 +1,7 @@
 {
     "files.readonlyInclude": {
-        "CLAUDE.md": true,
-        "AGENTS.md": true
+        "CLAUDE.md": false,
+        "AGENTS.md": false
     },
     "files.exclude": {
         "**/.git": true,
@@ -10,10 +10,10 @@
         "**/.jj": true,
         "**/.DS_Store": true,
         "**/Thumbs.db": true,
-        "CLAUDE.md": true,
-        "AGENTS.md": true,
-        "CLAUDE.md.bak": true,
-        "AGENTS.md.bak": true,
+        "CLAUDE.md": false,
+        "AGENTS.md": false,
+        "CLAUDE.md.bak": false,
+        "AGENTS.md.bak": false,
         ".vscode": true
     }
 }
