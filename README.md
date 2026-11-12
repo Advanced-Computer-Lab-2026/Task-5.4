@@ -70,10 +70,14 @@ Create the `server/.env` file.
 
 ```ini
 PORT=4000
-MONGO_URI=mongodb://tasks:pass1234@ac-j3acrgb-shard-00-00.lueesfz.mongodb.net:27017,ac-j3acrgb-shard-00-01.lueesfz.mongodb.net:27017,ac-j3acrgb-shard-00-02.lueesfz.mongodb.net:27017/?ssl=true&replicaSet=atlas-6to6iy-shard-0&authSource=admin&appName=Cluster0
-JWT_SECRET=4a498d90a0f923ae4b3f1f65571ff25985d17e2f3286e8e90383e449f68a40a8
+MONGO_URI=<your MongoDB connection string>
+JWT_SECRET=<a long random secret>
+CSRF_SECRET=<a separate long random secret>
 JWT_EXPIRES_IN=7d
 ```
+
+Use unique random secrets for `JWT_SECRET` and `CSRF_SECRET`. If `CSRF_SECRET` is
+not set, the server uses `JWT_SECRET` as a compatibility fallback.
 
 ## What was added on top of Task 3
 
@@ -106,6 +110,9 @@ JWT_EXPIRES_IN=7d
   `GET /api/auth/me`.
 - Added the **`Maintenance.jsx`** page (and a **Maintenance** nav link) for viewing and filing
   maintenance requests.
+- The client fetches a CSRF token before state-changing requests and sends it in
+  the `x-csrf-token` header. The API validates writes (except login and registration)
+  and limits maintenance endpoints to 30 requests per client per minute.
 
 </details>
 
