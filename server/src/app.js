@@ -6,6 +6,7 @@ import authRoutes from './routes/auth.js';
 import bookingRoutes from './routes/bookings.js';
 import userRoutes from './routes/users.js';
 import maintenanceRoutes from './routes/maintenance.js';
+import { csrfProtection, csrfTokenHandler } from './middleware/security.js';
 
 const app = express();
 
@@ -20,6 +21,16 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
+
+// Our own client fetches its anti-CSRF token here (a GET, so it is not checked).
+app.get('/api/csrf-token', csrfTokenHandler);
+
+// Every state-changing request (POST/PATCH/PUT/DELETE) must now carry a valid
+// x-csrf-token header. GET/HEAD/OPTIONS and the pre-auth login/register routes
+// are exempt. CORS and SameSite alone do not stop CSRF: CORS only blocks
+// *reading* the response, and SameSite ignores the port (localhost:1337 and
+// localhost:4000 are the same site), so the cookie is still sent.
+app.use(csrfProtection);
 
 app.use('/api/auth', authRoutes);
 app.use('/api/bookings', bookingRoutes);
