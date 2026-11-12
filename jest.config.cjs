@@ -1,0 +1,1 @@
+module.exports = { projects: ['server', 'client'].map(name => ({ displayName: name, testEnvironment: name === 'server' ? 'node' : 'jsdom', testMatch: [`<rootDir>/tests/${name}/**/*.test.js`], transform: { '^.+\\.js$': 'babel-jest' } })) };
