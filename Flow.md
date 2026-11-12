@@ -31,7 +31,11 @@ PORT=4000
 MONGO_URI=<your MongoDB connection string>
 JWT_SECRET=<any long random string>
 JWT_EXPIRES_IN=7d
+CSRF_SECRET=<another long random string>   # required once the CSRF fix is applied
 ```
+
+> With the fix applied (see *7. After the fix* below), the API refuses to start without
+> `CSRF_SECRET`.
 
 Start the app:
 
@@ -160,9 +164,52 @@ What to expect **in this vulnerable project**:
   point — your job is to make them green by adding CSRF protection and rate limiting. The
   solution project shows them all passing.
 
+> **Status:** this repository now contains the fix (see *7. After the fix*), so `npm test`
+> is green here. The paragraph above describes the original vulnerable starting point.
+
 Notes:
 
 - The server tests spin up an **in-memory MongoDB** via `mongodb-memory-server`. The first run
   downloads a small `mongod` binary, so you need **internet access the first time** (cached after).
 - You need **Node.js 18+ (20 recommended)**.
 - The same `npm test` works on **Windows, macOS, and Linux**.
+
+---
+
+## 7. After the fix
+
+The fix is in place: `csrf-csrf` (double-submit cookie) and `express-rate-limit`.
+
+**Server**
+
+- `server/src/middleware/csrf.js` sets up `csrf-csrf`. `GET /api/csrf-token` returns a token
+  and stores it in an httpOnly `SameSite=Strict` cookie. The token is HMAC-signed with
+  `CSRF_SECRET` and **bound to the session** (the JWT auth cookie), so a token from another
+  session, or one issued before login, is rejected.
+- `app.js` mounts the check globally. Every `POST`/`PATCH`/`PUT`/`DELETE` must send the token in
+  the `x-csrf-token` **header**, and it must match the cookie. A token in the request body is
+  ignored, so a forged HTML form can't supply one. If it fails, the API returns
+  `403 { code: "EBADCSRFTOKEN" }` before any route runs. Exempt: safe `GET`/`HEAD`/`OPTIONS`
+  requests, and the pre-auth `POST /api/auth/login` and `/register`.
+- `server/src/middleware/rateLimit.js` defines three per-IP limiters. They run before body
+  parsing, auth and the database:
+  - `/api/maintenance`: 30 requests/minute
+  - `/api/auth/login` + `/register`: 10 **failed** attempts per 15 minutes
+  - all of `/api`: 120 requests/minute
+
+  Over the limit, the API returns `429` with a JSON `message` and standard `RateLimit` /
+  `Retry-After` headers.
+
+**Client**
+
+- `client/src/api.js` adds an axios interceptor. Before the first mutating request it fetches
+  the token once (shared by concurrent requests), then attaches `x-csrf-token` to every write.
+  The cached token is dropped after login/register/logout, because the session changed. A CSRF
+  `403` triggers one refetch-and-retry.
+
+**Re-running the attacks:** at step 3 the forged `POST` now returns **403** and nothing is
+written. At step 4 only the first requests in the window get `200`; the rest of the flood gets
+**429**. Normal use of the app is unaffected.
+
+`npm test` now runs the shipped tests (`tests/server/csrf.test.js`, `tests/server/dos.test.js`,
+`tests/client/csrf.test.js`) plus extended suites (`*.extended.test.js`). All of them pass.
