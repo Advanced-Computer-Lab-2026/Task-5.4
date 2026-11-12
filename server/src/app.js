@@ -2,6 +2,8 @@ import express from 'express';
 import morgan from 'morgan';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
+import rateLimit from 'express-rate-limit';
+import { doubleCsrf } from 'csrf-csrf';
 import authRoutes from './routes/auth.js';
 import bookingRoutes from './routes/bookings.js';
 import userRoutes from './routes/users.js';
@@ -19,12 +21,43 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
+// ── CSRF protection (double-submit cookie pattern) ────────────────────────────
+// csrf-csrf generates a secret-signed token, stores part of it in an httpOnly
+// cookie, and expects the matching value in the x-csrf-token request header.
+// An attacker's page can forge the cookie but cannot READ it to build the
+// matching header value, so forged requests are rejected with 403.
+const { generateToken, doubleCsrfProtection } = doubleCsrf({
+  getSecret: () => process.env.JWT_SECRET,
+  cookieName: 'x-csrf-token',
+  cookieOptions: { sameSite: 'lax', secure: false, httpOnly: true },
+  getTokenFromRequest: (req) => req.headers['x-csrf-token'],
+});
+
+// Apply to all state-changing routes (GET/HEAD/OPTIONS are exempt automatically)
+app.use(doubleCsrfProtection);
+
+// Client fetches this once on boot, then sends the value as x-csrf-token header
+app.get('/api/csrf-token', (req, res) => {
+  res.json({ token: generateToken(req, res) });
+});
+
+// ── Rate limiting (DoS fix) ───────────────────────────────────────────────────
+// Maintenance and bookings write endpoints are capped to 30 req/min per IP.
+// Floods beyond that are rejected with 429 Too Many Requests.
+const writeLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: 'Too many requests, please slow down.' },
+});
+
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 
 app.use('/api/auth', authRoutes);
-app.use('/api/bookings', bookingRoutes);
+app.use('/api/bookings', writeLimiter, bookingRoutes);
 app.use('/api/users', userRoutes);
-app.use('/api/maintenance', maintenanceRoutes);
+app.use('/api/maintenance', writeLimiter, maintenanceRoutes);
 
 // Not found
 app.use((req, res) => {
