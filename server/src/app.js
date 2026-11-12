@@ -6,6 +6,7 @@ import authRoutes from './routes/auth.js';
 import bookingRoutes from './routes/bookings.js';
 import userRoutes from './routes/users.js';
 import maintenanceRoutes from './routes/maintenance.js';
+import { csrfProtection, csrfTokenHandler } from './middleware/csrf.js';
 
 const app = express();
 
@@ -18,6 +19,15 @@ app.use(express.json());
 // which needs no JavaScript and triggers no CORS preflight) is understood.
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
+
+// CSRF: the client fetches its token here, then echoes it on every write.
+app.get('/api/csrf-token', csrfTokenHandler);
+// Every state-changing request (POST/PUT/PATCH/DELETE) must carry a valid token.
+// GET/HEAD/OPTIONS and the pre-auth login/register routes are exempt.
+// (CORS and SameSite alone don't stop CSRF: CORS only hides the response from the
+// attacker — the request is still sent and acted on — and SameSite ignores the
+// port, so localhost:1337 counts as the same site as localhost:4000.)
+app.use(csrfProtection);
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 
