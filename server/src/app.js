@@ -6,6 +6,8 @@ import authRoutes from './routes/auth.js';
 import bookingRoutes from './routes/bookings.js';
 import userRoutes from './routes/users.js';
 import maintenanceRoutes from './routes/maintenance.js';
+import { csrfProtection, csrfTokenHandler } from './middleware/csrf.js';
+import { maintenanceLimiter, maintenanceWriteLimiter } from './middleware/rateLimit.js';
 
 const app = express();
 
@@ -21,10 +23,18 @@ app.use(cookieParser());
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 
+// Our own client fetches its anti-CSRF token here (a GET, so it is exempt).
+app.get('/api/csrf-token', csrfTokenHandler);
+
+// Require a valid CSRF token on every state-changing request (POST/PUT/PATCH/
+// DELETE), except the pre-auth login/register routes. GETs stay exempt.
+app.use(csrfProtection);
+
 app.use('/api/auth', authRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/users', userRoutes);
-app.use('/api/maintenance', maintenanceRoutes);
+// Throttle the maintenance feature so one client cannot flood it (429).
+app.use('/api/maintenance', maintenanceLimiter, maintenanceWriteLimiter, maintenanceRoutes);
 
 // Not found
 app.use((req, res) => {
