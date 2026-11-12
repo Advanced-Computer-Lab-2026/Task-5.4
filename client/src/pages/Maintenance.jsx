@@ -12,8 +12,12 @@ export default function Maintenance() {
   const [loading, setLoading] = useState(false)
 
   async function load() {
-    const res = await api.get('/maintenance')
-    setRequests(res.data.requests)
+    try {
+      const res = await api.get('/maintenance')
+      setRequests(res.data.requests)
+    } catch (err) {
+      setError(err?.response?.data?.message || 'Could not load maintenance requests')
+    }
   }
 
   useEffect(() => { load() }, [])
