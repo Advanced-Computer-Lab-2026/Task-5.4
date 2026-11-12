@@ -1,6 +1,8 @@
+import { randomUUID } from 'node:crypto';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import Joi from 'joi';
+import { clearCsrfCookie } from '../middleware/csrf.js';
 import { User } from '../models/User.js';
 
 // How long the auth cookie lives, in ms (mirrors JWT_EXPIRES_IN's default of 7d).
@@ -67,6 +69,7 @@ export async function login(req, res, next) {
 // POST /api/auth/logout
 export async function logout(req, res) {
   res.clearCookie('token');
+  clearCsrfCookie(res);
   res.json({ ok: true });
 }
 
@@ -80,7 +83,7 @@ export async function me(req, res, next) {
 
 function signToken(user) {
   const payload = { id: user._id.toString(), name: user.name };
-  return jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '7d' });
+  return jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '7d', jwtid: randomUUID() });
 }
 
 function publicUser(u) {
