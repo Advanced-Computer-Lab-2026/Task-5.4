@@ -166,8 +166,7 @@ npm test
 ```
 
 The `CSRF` and `DoS` tests describe the **secure** behavior and fail in the vulnerable starter.
-With the protections below installed, the six original tests and the additional security
-regression tests should pass.
+With the protections below installed, the six original tests should pass.
 
 ### Implemented protections and verification
 
