@@ -7,9 +7,20 @@ import {
   updateRequest,
   deleteRequest
 } from '../controllers/maintenanceController.js';
+import { rateLimit } from 'express-rate-limit';
 
 const router = Router();
+const maintenanceLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 20,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: {
+    message: 'Too many maintenance requests; try again later.'
+  }
+});
 
+router.use(maintenanceLimiter);
 // Reading is public; writing requires a logged-in user.
 //
 // VULNERABLE on two fronts:
