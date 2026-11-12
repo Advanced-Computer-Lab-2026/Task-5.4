@@ -1,0 +1,42 @@
+name: Attack Simulation
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/attack-sim.mjs'
+      - '.github/workflows/attack-sim.yaml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  simulate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Run the attacks (CSRF + DoS) against the real API
+        run: |
+          mkdir -p attack-report
+          node scripts/attack-sim.mjs 2>&1 | tee attack-report/report.md
+          echo "--- exit: ${PIPESTATUS[0]} ---"
+
+      - name: Commit the report back to the repo
+        run: |
+          git config user.name "attack-sim-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add attack-report/report.md
+          git diff --cached --quiet || git commit -m "chore: attack simulation report [skip ci]"
+          git push
