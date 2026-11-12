@@ -6,6 +6,9 @@ import authRoutes from './routes/auth.js';
 import bookingRoutes from './routes/bookings.js';
 import userRoutes from './routes/users.js';
 import maintenanceRoutes from './routes/maintenance.js';
+import { rateLimit } from 'express-rate-limit';
+import { requireAuth } from './middleware/auth.js';
+import { doubleCsrfProtection, generateCsrfToken } from './middleware/csrf.js';
 
 const app = express();
 
@@ -21,6 +24,24 @@ app.use(cookieParser());
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 
+// Adapted from https://express-rate-limit.mintlify.app/quickstart/usage
+// Run before CSRF/controllers so rejected writes and reads share the IP budget.
+app.use('/api/maintenance', rateLimit({
+  windowMs: 60 * 1000,
+  limit: 30,
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+  message: { message: 'Too many maintenance requests. Please try again later.' }
+}));
+
+app.get('/api/csrf-token', requireAuth, (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.json({ csrfToken: generateCsrfToken(req, res) });
+});
+// Protect all API writes, including bookings, user changes, and logout.
+// GET/HEAD/OPTIONS and exactly POST login/register are exempt.
+app.use('/api', doubleCsrfProtection);
+
 app.use('/api/auth', authRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/users', userRoutes);
@@ -33,6 +54,9 @@ app.use((req, res) => {
 
 // Error handler
 app.use((err, req, res, next) => {
+  if (err.code === 'EBADCSRFTOKEN') {
+    return res.status(403).json({ message: 'Invalid CSRF token', code: err.code });
+  }
   console.error(err);
   res.status(err.status || 500).json({ message: err.message || 'Server Error' });
 });

@@ -1,9 +1,4 @@
-import fs from 'fs';
-import path from 'path';
-
-const serverTestPath = path.join(process.cwd(), 'tests', 'server', 'dos.test.js');
-
-const serverTestContent = `import request from 'supertest';
+import request from 'supertest';
 import mongoose from 'mongoose';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import app from '../../server/src/app.js';
@@ -14,14 +9,18 @@ beforeAll(async () => {
   process.env.JWT_SECRET = 'test-secret';
   process.env.JWT_EXPIRES_IN = '1h';
   process.env.CSRF_SECRET = 'test-csrf-secret';
-  mongo = await MongoMemoryServer.create();
+  mongo = new MongoMemoryServer();
+  await mongo.start();
   await mongoose.connect(mongo.getUri());
 }, 60000);
 
 afterAll(async () => {
-  await mongoose.disconnect();
-  if (mongo) await mongo.stop();
-});
+  try {
+    await mongoose.disconnect();
+  } finally {
+    if (mongo) await mongo.stop();
+  }
+}, 30000);
 
 describe('Maintenance requests — DoS / rate limiting', () => {
   test('a normal request to the public list succeeds (the happy path)', async () => {
@@ -46,9 +45,3 @@ describe('Maintenance requests — DoS / rate limiting', () => {
     expect(statuses).toContain(429);
   });
 });
-`;
-
-if (!fs.existsSync(serverTestPath)) {
-  fs.mkdirSync(path.dirname(serverTestPath), { recursive: true });
-  fs.writeFileSync(serverTestPath, serverTestContent, { encoding: 'utf8' });
-}
