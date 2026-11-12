@@ -6,6 +6,8 @@ import authRoutes from './routes/auth.js';
 import bookingRoutes from './routes/bookings.js';
 import userRoutes from './routes/users.js';
 import maintenanceRoutes from './routes/maintenance.js';
+import { csrfTokenHandler, doubleCsrfProtection } from './middleware/csrf.js';
+import { maintenanceLimiter } from './middleware/rateLimit.js';
 
 const app = express();
 
@@ -21,10 +23,15 @@ app.use(cookieParser());
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 
+// Token endpoint (safe GET) — hands the client its per-session CSRF token.
+app.get('/api/csrf-token', csrfTokenHandler);
+// Every non-GET request must carry a valid CSRF token (login/register exempt).
+app.use(doubleCsrfProtection);
+
 app.use('/api/auth', authRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/users', userRoutes);
-app.use('/api/maintenance', maintenanceRoutes);
+app.use('/api/maintenance', maintenanceLimiter, maintenanceRoutes);
 
 // Not found
 app.use((req, res) => {
