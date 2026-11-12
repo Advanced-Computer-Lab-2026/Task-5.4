@@ -1,5 +1,10 @@
+
 import { Router } from 'express';
+import { rateLimit } from 'express-rate-limit';
+
 import { requireAuth } from '../middleware/auth.js';
+import { doubleCsrfProtection } from '../middleware/csrf.js';
+
 import {
   getAllRequests,
   getRequest,
@@ -10,20 +15,46 @@ import {
 
 const router = Router();
 
-// Reading is public; writing requires a logged-in user.
-//
-// VULNERABLE on two fronts:
-//   1. CSRF — the write routes trust the auth cookie alone. There is no
-//      anti-CSRF token, so any website the victim visits can forge a
-//      state-changing request in the victim's name (the browser attaches the
-//      cookie automatically).
-//   2. DoS — there is no rate limiting anywhere, so the public list endpoint
-//      (and the writes) can be flooded with unlimited requests to exhaust the
-//      server.
+// DoS protection: maximum 20 requests per minute
+const maintenanceLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 20,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: {
+    message: 'Too many requests. Please try again later.'
+  }
+});
+
+// Apply rate limiting to every maintenance endpoint
+router.use(maintenanceLimiter);
+
+// GET requests do not need CSRF tokens
 router.get('/', getAllRequests);
 router.get('/:id', getRequest);
-router.post('/', requireAuth, createRequest);
-router.patch('/:id', requireAuth, updateRequest);
-router.delete('/:id', requireAuth, deleteRequest);
+
+// POST requires authentication and a valid CSRF token
+router.post(
+  '/',
+  requireAuth,
+  doubleCsrfProtection,
+  createRequest
+);
+
+// PATCH requires authentication and a valid CSRF token
+router.patch(
+  '/:id',
+  requireAuth,
+  doubleCsrfProtection,
+  updateRequest
+);
+
+// DELETE requires authentication and a valid CSRF token
+router.delete(
+  '/:id',
+  requireAuth,
+  doubleCsrfProtection,
+  deleteRequest
+);
 
 export default router;
