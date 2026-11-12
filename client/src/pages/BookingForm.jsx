@@ -16,13 +16,13 @@ export default function BookingForm() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // TODO 3: When editing, load the booking and fill the form
+  // When editing, load the booking and fill the form.
   useEffect(() => {
     if (!isEdit) return;
 
     const load = async () => {
       try {
-        const { data } = await api.get(`/bookings/${id}`);
+        const { data: { booking: data } } = await api.get(`/bookings/${id}`);
         setForm({
           roomNumber: data.roomNumber || '',
           // Server sends ISO strings; date inputs need YYYY-MM-DD
@@ -38,12 +38,12 @@ export default function BookingForm() {
     load();
   }, [id, isEdit]);
 
-  // TODO 1: every input updates form
+  // Every input updates form.
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
-  // TODO 2: create or update a booking
+  // Create or update a booking.
   const onSubmit = async (e) => {
     e.preventDefault();
     setError('');
