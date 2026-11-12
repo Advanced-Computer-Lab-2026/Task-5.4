@@ -12,7 +12,9 @@ const COOKIE_MAX_AGE = 7 * 24 * 60 * 60 * 1000;
 function setAuthCookie(res, token) {
   res.cookie('token', token, {
     httpOnly: true,
-    sameSite: 'lax',
+    // Defense in depth only: on localhost every port is the same "site", so
+    // SameSite does not stop the demo attack — the CSRF token does.
+    sameSite: 'strict',
     secure: false, // true in production (HTTPS only)
     maxAge: COOKIE_MAX_AGE
   });
@@ -67,6 +69,7 @@ export async function login(req, res, next) {
 // POST /api/auth/logout
 export async function logout(req, res) {
   res.clearCookie('token');
+  res.clearCookie('x-csrf-token', { path: '/' });
   res.json({ ok: true });
 }
 
