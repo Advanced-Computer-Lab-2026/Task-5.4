@@ -6,6 +6,7 @@ import authRoutes from './routes/auth.js';
 import bookingRoutes from './routes/bookings.js';
 import userRoutes from './routes/users.js';
 import maintenanceRoutes from './routes/maintenance.js';
+import { generateCsrfToken, invalidCsrfTokenError } from './middleware/csrf.js';
 
 const app = express();
 
@@ -20,6 +21,10 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
+app.get('/api/csrf-token', (req, res) => {
+  const csrfToken = generateCsrfToken(req, res);
+  res.json({ csrfToken });
+});
 
 app.use('/api/auth', authRoutes);
 app.use('/api/bookings', bookingRoutes);
@@ -33,8 +38,10 @@ app.use((req, res) => {
 
 // Error handler
 app.use((err, req, res, next) => {
+  if (err === invalidCsrfTokenError || err.code === 'EBADCSRFTOKEN') {
+    return res.status(403).json({ message: 'Invalid or missing CSRF token' });
+  }
   console.error(err);
-  res.status(err.status || 500).json({ message: err.message || 'Server Error' });
+  res.status(err.status || err.statusCode || 500).json({ message: err.message || 'Server Error' });
 });
-
 export default app;
