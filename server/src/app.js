@@ -38,7 +38,7 @@ app.use(doubleCsrfProtection);
 
 // Client fetches this once on boot, then sends the value as x-csrf-token header
 app.get('/api/csrf-token', (req, res) => {
-  res.json({ token: generateToken(req, res) });
+  res.json({ csrfToken: generateToken(req, res) });
 });
 
 // ── Rate limiting (DoS fix) ───────────────────────────────────────────────────

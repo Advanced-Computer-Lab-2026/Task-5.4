@@ -18,7 +18,7 @@ let csrfToken = null
 
 async function fetchCsrfToken() {
   const { data } = await api.get('/csrf-token')
-  csrfToken = data.token
+  csrfToken = data.csrfToken
   return csrfToken
 }
 
