@@ -6,6 +6,8 @@ import authRoutes from './routes/auth.js';
 import bookingRoutes from './routes/bookings.js';
 import userRoutes from './routes/users.js';
 import maintenanceRoutes from './routes/maintenance.js';
+import { doubleCsrfProtection, invalidCsrfTokenError, sendCsrfToken } from './middleware/csrf.js';
+import { maintenanceLimiter } from './middleware/rateLimit.js';
 
 const app = express();
 
@@ -18,6 +20,15 @@ app.use(express.json());
 // which needs no JavaScript and triggers no CORS preflight) is understood.
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
+
+// Throttle the maintenance feature first, so a flood is refused with 429
+// before it costs a CSRF check, a JWT verification or a database query.
+app.use('/api/maintenance', maintenanceLimiter);
+
+// Every state-changing request (POST/PUT/PATCH/DELETE) on every route must
+// carry a valid CSRF token. GET/HEAD/OPTIONS and login/register are exempt.
+app.use(doubleCsrfProtection);
+app.get('/api/csrf-token', sendCsrfToken);
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 
@@ -33,6 +44,9 @@ app.use((req, res) => {
 
 // Error handler
 app.use((err, req, res, next) => {
+  if (err === invalidCsrfTokenError) {
+    return res.status(403).json({ message: 'Invalid or missing CSRF token' });
+  }
   console.error(err);
   res.status(err.status || 500).json({ message: err.message || 'Server Error' });
 });
