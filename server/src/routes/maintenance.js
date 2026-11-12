@@ -7,9 +7,21 @@ import {
   updateRequest,
   deleteRequest
 } from '../controllers/maintenanceController.js';
+import { requireCsrf } from '../middleware/csrf.js';
+import { rateLimit } from 'express-rate-limit';
 
 const router = Router();
+const maintenanceLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 30,
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+  message: {
+    message: 'Too many maintenance requests. Try again in a minute.'
+  }
+});
 
+router.use(maintenanceLimiter);
 // Reading is public; writing requires a logged-in user.
 //
 // VULNERABLE on two fronts:
@@ -22,8 +34,9 @@ const router = Router();
 //      server.
 router.get('/', getAllRequests);
 router.get('/:id', getRequest);
-router.post('/', requireAuth, createRequest);
-router.patch('/:id', requireAuth, updateRequest);
-router.delete('/:id', requireAuth, deleteRequest);
+
+router.post('/', requireAuth, requireCsrf, createRequest);
+router.patch('/:id', requireAuth, requireCsrf, updateRequest);
+router.delete('/:id', requireAuth, requireCsrf, deleteRequest);
 
 export default router;
