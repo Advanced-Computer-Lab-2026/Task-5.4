@@ -6,6 +6,8 @@ import authRoutes from './routes/auth.js';
 import bookingRoutes from './routes/bookings.js';
 import userRoutes from './routes/users.js';
 import maintenanceRoutes from './routes/maintenance.js';
+import { csrfToken, doubleCsrfProtection } from './middleware/csrf.js';
+import { maintenanceLimiter } from './middleware/rateLimit.js';
 
 const app = express();
 
@@ -21,6 +23,15 @@ app.use(cookieParser());
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 
+// DoS: rate-limit the maintenance feature. Mounted before CSRF/auth so a flood
+// is refused as cheaply as possible.
+app.use('/api/maintenance', maintenanceLimiter);
+
+// CSRF: the client fetches a token here, then echoes it in `x-csrf-token` on
+// every state-changing request. GET/HEAD/OPTIONS and login/register are exempt.
+app.get('/api/csrf-token', csrfToken);
+app.use(doubleCsrfProtection);
+
 app.use('/api/auth', authRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/users', userRoutes);
@@ -33,8 +44,8 @@ app.use((req, res) => {
 
 // Error handler
 app.use((err, req, res, next) => {
-  console.error(err);
-  res.status(err.status || 500).json({ message: err.message || 'Server Error' });
+  if (err.code !== 'EBADCSRFTOKEN') console.error(err);
+  res.status(err.status || 500).json({ message: err.message || 'Server Error', code: err.code });
 });
 
 export default app;
