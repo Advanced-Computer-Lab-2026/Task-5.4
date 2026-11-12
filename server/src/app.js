@@ -41,7 +41,7 @@ app.use(express.urlencoded({ extended: true, limit: '10kb' }));
 app.use(cookieParser());
 
 // ---- CSRF protection (must come after cookieParser, before the routes) ----
-const { generateToken, doubleCsrfProtection } = doubleCsrf({
+const csrf = doubleCsrf({
   getSecret: () => process.env.CSRF_SECRET,
   getSessionIdentifier: (req) => req.cookies.token ?? '',
   cookieName: 'csrf-token',
@@ -55,6 +55,10 @@ const { generateToken, doubleCsrfProtection } = doubleCsrf({
   skipCsrfProtection: (req) =>
     req.path === '/api/auth/login' || req.path === '/api/auth/register',
 });
+
+const { doubleCsrfProtection } = csrf;
+// csrf-csrf v4 renamed generateToken -> generateCsrfToken; support both.
+const generateToken = csrf.generateCsrfToken ?? csrf.generateToken;
 
 app.get('/api/csrf-token', (req, res) => {
   res.json({ csrfToken: generateToken(req, res) });
