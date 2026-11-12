@@ -1,0 +1,32 @@
+name: Security Tests (CSRF + DoS)
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch: # adds a "Run workflow" button in the Actions tab
+
+jobs:
+  security-tests:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: CSRF test (server) - forged request must get 403
+        run: npx jest tests/server/csrf.test.js --verbose
+
+      - name: DoS test (server) - flood must get 429
+        run: npx jest tests/server/dos.test.js --verbose
+
+      - name: CSRF test (client) - app must send x-csrf-token
+        run: npx jest tests/client/csrf.test.js --verbose
