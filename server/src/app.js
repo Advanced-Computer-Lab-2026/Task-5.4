@@ -2,6 +2,7 @@ import express from 'express';
 import morgan from 'morgan';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
+import { doubleCsrfProtection, generateCsrfToken } from './middleware/csrf.js';
 import authRoutes from './routes/auth.js';
 import bookingRoutes from './routes/bookings.js';
 import userRoutes from './routes/users.js';
@@ -18,8 +19,12 @@ app.use(express.json());
 // which needs no JavaScript and triggers no CORS preflight) is understood.
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
+app.use(doubleCsrfProtection);
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
+app.get('/api/csrf-token', (req, res) => {
+  res.json({ csrfToken: generateCsrfToken(req, res, { overwrite: true }) });
+});
 
 app.use('/api/auth', authRoutes);
 app.use('/api/bookings', bookingRoutes);
