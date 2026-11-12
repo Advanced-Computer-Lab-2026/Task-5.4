@@ -31,6 +31,7 @@ PORT=4000
 MONGO_URI=<your MongoDB connection string>
 JWT_SECRET=<any long random string>
 JWT_EXPIRES_IN=7d
+CSRF_SECRET=<any long random string, different from JWT_SECRET>
 ```
 
 Start the app:
