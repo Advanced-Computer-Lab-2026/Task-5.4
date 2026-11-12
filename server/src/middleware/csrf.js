@@ -16,7 +16,15 @@ export function setCsrfCookie(res) {
   return token;
 }
 
-const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
+// GET /api/csrf-token — returns the token the client must echo in X-CSRF-Token.
+// Reuses the existing cookie value (set at login/register) so cookie and body
+// always match; issues a fresh one only if the visitor has none yet.
+export function csrfTokenHandler(req, res) {
+  const token = req.cookies?.csrfToken || setCsrfCookie(res);
+  res.json({ csrfToken: token });
+}
+
+const SAFE_METHODS =new Set(['GET', 'HEAD', 'OPTIONS']);
 // These issue the token (and need no session yet), so they are exempt.
 const EXEMPT_PATHS = new Set(['/auth/login', '/auth/register']);
 

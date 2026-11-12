@@ -2,8 +2,8 @@ import express from 'express';
 import morgan from 'morgan';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
-import { csrfProtection } from './middleware/csrf.js';
-import { apiLimiter, authLimiter, writeLimiter } from './middleware/rateLimit.js';
+import { csrfProtection, csrfTokenHandler } from './middleware/csrf.js';
+import { apiLimiter, authLimiter, writeLimiter, maintenanceReadLimiter } from './middleware/rateLimit.js';
 import authRoutes from './routes/auth.js';
 import bookingRoutes from './routes/bookings.js';
 import userRoutes from './routes/users.js';
@@ -25,6 +25,7 @@ app.use('/api', apiLimiter);
 app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/register', authLimiter);
 app.use('/api', writeLimiter);
+app.get('/api/maintenance', maintenanceReadLimiter);
 
 // Body size is capped at 10kb (Express defaults to 100kb).
 app.use(express.json({ limit: '10kb' }));
@@ -35,6 +36,7 @@ app.use(cookieParser());
 // Reject state-changing requests that lack a matching CSRF header.
 app.use('/api', csrfProtection);
 
+app.get('/api/csrf-token', csrfTokenHandler);
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 
 app.use('/api/auth', authRoutes);

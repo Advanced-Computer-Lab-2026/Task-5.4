@@ -18,6 +18,15 @@ export const authLimiter = rateLimit({
   message: { message: 'Too many attempts, try again later.' }
 });
 
+// Public maintenance list: unauthenticated and queries the DB, so it gets a
+// tight per-IP cap. A flood is answered with 429 instead of being served.
+export const maintenanceReadLimiter = rateLimit({
+  ...base,
+  windowMs: 60 * 1000,
+  limit: 20,
+  message: { message: 'Too many requests, slow down.' }
+});
+
 // Tighter limit on writes (create/update/delete).
 export const writeLimiter = rateLimit({
   ...base,
