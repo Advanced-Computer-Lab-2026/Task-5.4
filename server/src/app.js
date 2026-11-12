@@ -2,6 +2,7 @@ import express from 'express';
 import morgan from 'morgan';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
+import { doubleCsrfProtection, generateCsrfToken } from './middleware/csrf.js';
 import authRoutes from './routes/auth.js';
 import bookingRoutes from './routes/bookings.js';
 import userRoutes from './routes/users.js';
@@ -19,6 +20,16 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
+// Anti-CSRF token endpoint: issues a secret double-submit CSRF token bound to the current session.
+app.get('/api/csrf-token', (req, res) => {
+  const csrfToken = generateCsrfToken(req, res);
+  res.json({ csrfToken });
+});
+
+// Protect all state-changing endpoints with double-submit CSRF protection.
+// Safe methods (GET, HEAD, OPTIONS) and pre-auth endpoints (login, register) are exempt.
+app.use(doubleCsrfProtection);
+
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 
 app.use('/api/auth', authRoutes);
@@ -33,8 +44,11 @@ app.use((req, res) => {
 
 // Error handler
 app.use((err, req, res, next) => {
+  if (err.code === 'EBADCSRFTOKEN' || err.status === 403 || err.statusCode === 403) {
+    return res.status(403).json({ message: err.message || 'Invalid CSRF token' });
+  }
   console.error(err);
-  res.status(err.status || 500).json({ message: err.message || 'Server Error' });
+  res.status(err.status || err.statusCode || 500).json({ message: err.message || 'Server Error' });
 });
 
 export default app;
