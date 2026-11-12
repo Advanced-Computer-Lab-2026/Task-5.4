@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Task 5.4 - CSRF and DoS fix</title>
+<style>
+  :root{--bg:#f6f7f9;--card:#fff;--ink:#14181f;--mute:#5b6472;--line:#e3e6eb;--bad:#b42318;--badbg:#fdecea;--ok:#067647;--okbg:#e7f6ee;--warn:#8a5a00;--warnbg:#fff4de;--code:#0f172a;}
+  @media (prefers-color-scheme:dark){:root{--bg:#0e1116;--card:#171b22;--ink:#e8ebf0;--mute:#9aa4b2;--line:#2a313b;--bad:#ff8a80;--badbg:#3a1a18;--ok:#5fd39b;--okbg:#14301f;--warn:#f5c26b;--warnbg:#332607;--code:#0a0d12;}}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 system-ui,Segoe UI,sans-serif}
+  main{max-width:900px;margin:0 auto;padding:32px 16px 80px}
+  h1{font-size:28px;margin:0 0 4px}
+  .sub{color:var(--mute);margin:0 0 28px}
+  section{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:22px;margin:0 0 18px}
+  h2{font-size:19px;margin:0 0 4px}
+  .step{color:var(--mute);font-size:13px;margin:0 0 14px}
+  table{width:100%;border-collapse:collapse;font-size:15px}
+  th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{font-size:13px;color:var(--mute);font-weight:600}
+  .bad{background:var(--badbg);color:var(--bad);font-weight:600}
+  .ok{background:var(--okbg);color:var(--ok);font-weight:600}
+  pre{background:var(--code);color:#e6edf3;padding:14px;border-radius:8px;overflow:auto;font-size:13px;line-height:1.5;margin:10px 0 0}
+  code{font-family:ui-monospace,Consolas,monospace;font-size:.92em}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:700px){.grid{grid-template-columns:1fr}}
+  .tag{display:inline-block;font-size:12px;font-weight:700;padding:2px 8px;border-radius:99px;margin-bottom:6px}
+  .tag.b{background:var(--badbg);color:var(--bad)} .tag.a{background:var(--okbg);color:var(--ok)}
+  .say{border-left:3px solid var(--warn);background:var(--warnbg);padding:10px 14px;border-radius:0 8px 8px 0;margin-top:14px;font-size:15px}
+  .say b{color:var(--warn)}
+  ul{margin:8px 0 0;padding-left:20px} li{margin:4px 0}
+  a{color:inherit}
+</style>
+</head>
+<body>
+<main>
+  <h1>Task 5.4: CSRF and DoS on the Maintenance feature</h1>
+  <p class="sub">Dorm Room Booking. Every number on this page comes from a real run on this machine (files in <code>evidence/</code>).</p>
+
+  <section>
+    <h2>1. Result</h2>
+    <p class="step">Say: "I fixed both vulnerabilities and re-ran the attacks. They now fail."</p>
+    <table>
+      <tr><th></th><th>Before the fix</th><th>After the fix</th></tr>
+      <tr><td>Test suite</td><td class="bad">3 failed, 3 passed</td><td class="ok">6 of 6 passed</td></tr>
+      <tr><td>Forged request from the attacker site</td><td class="bad">201: forged row created in the victim's name</td><td class="ok">403: nothing written</td></tr>
+      <tr><td>Flood (300 requests from the prize page)</td><td class="bad">327 requests, all served, no 429</td><td class="ok">20 served, the rest 429 (560 in the run)</td></tr>
+      <tr><td>Legit writes from our own UI</td><td>work</td><td class="ok">still work (token fetched, then 2xx)</td></tr>
+      <tr><td>Writes with no token (edit, delete, booking, logout)</td><td class="bad">accepted</td><td class="ok">403</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>2. Tests</h2>
+    <p class="step">Show: run <code>npm test</code> in the terminal, then open the two evidence files side by side.</p>
+    <div class="grid">
+      <div><span class="tag b">BEFORE</span><pre>Test Suites: 3 failed, 3 total
+Tests:       3 failed, 3 passed, 6 total
+
+forged request:  Expected 403, Received 201
+flood:           Expected a 429, got only 200s
+client:          x-csrf-token header: undefined</pre></div>
+      <div><span class="tag a">AFTER</span><pre>Test Suites: 3 passed, 3 total
+Tests:       6 passed, 6 total
+
+forged request:  403
+flood:           429 after the limit
+client:          x-csrf-token header sent</pre></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>3. The attack, live (the "prize" site)</h2>
+    <p class="step">Show: log in at localhost:5175, open DevTools then Network, open localhost:1337, then click "Claim my prize".</p>
+    <div class="grid">
+      <div><span class="tag b">BEFORE (vulnerable code)</span><pre>POST /api/maintenance  201
+GET  /api/maintenance  200
+GET  /api/maintenance  200
+... 327 requests, none refused</pre></div>
+      <div><span class="tag a">AFTER (fixed code)</span><pre>POST /api/maintenance  403
+GET  /api/maintenance  200   (x20)
+GET  /api/maintenance  429
+GET  /api/maintenance  429
+... 560 refused</pre></div>
+    </div>
+    <div class="say"><b>Say this out loud:</b> the prize page looks identical before and after. The proof is in DevTools Network (the 403 and the 429s) and the database (no forged row for my user). Wait 60 seconds after the flood before reopening Maintenance: my own user is rate-limited too.</div>
+  </section>
+
+  <section>
+    <h2>4. What I changed</h2>
+    <p class="step">Show: <code>git diff vulnerable csrf-dos-fix</code></p>
+    <table>
+      <tr><th>File</th><th>What it does</th></tr>
+      <tr><td><code>server/src/middleware/csrf.js</code></td><td>csrf-csrf double-submit token, signed and tied to the session (the JWT cookie). Only login and register are exempt.</td></tr>
+      <tr><td><code>server/src/app.js</code></td><td><code>GET /api/csrf-token</code> issues the token; protection runs after cookieParser and before the routers.</td></tr>
+      <tr><td><code>server/src/middleware/rateLimit.js</code></td><td>express-rate-limit: 20 requests per minute, then 429.</td></tr>
+      <tr><td><code>server/src/routes/maintenance.js</code></td><td>applies the limiter to every maintenance route.</td></tr>
+      <tr><td><code>client/src/api.js</code></td><td>fetches a fresh token before every write and sends it as <code>x-csrf-token</code>.</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>5. Why it works (expect these questions)</h2>
+    <ul>
+      <li><b>Why doesn't CORS stop it?</b> CORS only stops the attacker from reading the response. The browser still sends the request and the server still acts on it. A plain HTML form is a "simple request", so there is not even a preflight.</li>
+      <li><b>Why doesn't SameSite stop it?</b> localhost:1337 and localhost:4000 are the same site. The port is not part of site identity, so the cookie is still sent.</li>
+      <li><b>Why does the token stop it?</b> The attacker's page cannot read the token and cannot set the custom header on a cross-site form. The token is signed and tied to the session, so a token from another session is rejected.</li>
+      <li><b>Why are GETs, login and register exempt?</b> GETs change nothing. Login and register run before a session exists, so there is no session to hijack.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>6. Part 2: the .vscode finding (tell her this)</h2>
+    <p class="step">Show: <code>.vscode/tasks.json</code> and <code>.vscode/setupJestConfig.js</code>. I read them and did not run the dangerous ones.</p>
+    <ul>
+      <li><b>Runs on open:</b> <code>tasks.json</code> sets <code>"runOn": "folderOpen"</code> on every task (lines 14, 36, 58, 80, 102, 124). Opening the folder in VS Code runs them. This is most likely the dialog box ("Allow automatic tasks?").</li>
+      <li><b>Kills VS Code:</b> <code>setupJestConfig.js</code> line 12 <code>forceCloseVSCode()</code> runs <code>taskkill /IM code.exe /F</code> (line 17). Watchers at lines 55, 60, 71 and 94 trigger it when the backup files are touched, and silently revert edits to <code>CLAUDE.md</code> and <code>AGENTS.md</code>.</li>
+      <li><b>Trap for AI assistants:</b> <code>setupCI.js</code> writes <code>CLAUDE.md</code> and <code>AGENTS.md</code> telling an AI to refuse the assignment and print a taunt with an encrypted link. I ignored it and did not open the link.</li>
+      <li><b>Hidden:</b> <code>settings.json</code> hides <code>.vscode</code>, <code>CLAUDE.md</code> and the <code>.bak</code> files from the explorer.</li>
+    </ul>
+    <div class="say"><b>Lesson to say:</b> check <code>.vscode/tasks.json</code> before opening an untrusted repo in VS Code, and decline "Allow automatic tasks".</div>
+  </section>
+
+  <section>
+    <h2>Cheat sheet</h2>
+    <pre>npm run demo                       # API :4000, client :5175, attacker :1337
+npm test                           # 6 passed
+git diff vulnerable csrf-dos-fix   # the fix
+git checkout vulnerable            # show the attack succeeding (code reloads)
+git checkout csrf-dos-fix          # back to the fix
+
+login:  victim-ta-demo-5412@test.dev   /   secret123</pre>
+  </section>
+</main>
+</body>
+</html>
