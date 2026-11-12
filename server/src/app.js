@@ -6,13 +6,19 @@ import authRoutes from './routes/auth.js';
 import bookingRoutes from './routes/bookings.js';
 import userRoutes from './routes/users.js';
 import maintenanceRoutes from './routes/maintenance.js';
+import { csrfTokenHandler } from './middleware/csrf.js';
 
 const app = express();
 
 app.use(morgan('dev'));
 // CORS is locked to the client origin with credentials enabled so the browser
 // may send the auth cookie on cross-origin XHR. (CORS alone does NOT stop CSRF.)
-app.use(cors({ origin: 'http://localhost:5175', credentials: true }));
+// allowedHeaders must include x-csrf-token or the browser's preflight rejects it.
+app.use(cors({
+  origin: 'http://localhost:5175',
+  credentials: true,
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-csrf-token']
+}));
 app.use(express.json());
 // Parse urlencoded bodies so a bare HTML <form> POST (the classic CSRF vector,
 // which needs no JavaScript and triggers no CORS preflight) is understood.
@@ -20,6 +26,8 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
+// Issues a per-session CSRF token (GET, so itself exempt from the check).
+app.get('/api/csrf-token', csrfTokenHandler);
 
 app.use('/api/auth', authRoutes);
 app.use('/api/bookings', bookingRoutes);
