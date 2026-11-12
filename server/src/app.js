@@ -6,6 +6,8 @@ import authRoutes from './routes/auth.js';
 import bookingRoutes from './routes/bookings.js';
 import userRoutes from './routes/users.js';
 import maintenanceRoutes from './routes/maintenance.js';
+import { doubleCsrf } from 'csrf-csrf';
+import { requireAuth } from './middleware/auth.js';
 
 const app = express();
 
@@ -19,12 +21,38 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
+const {
+  generateCsrfToken,
+  doubleCsrfProtection
+} = doubleCsrf({
+  getSecret: () => process.env.CSRF_SECRET || process.env.JWT_SECRET,
+  getSessionIdentifier: (req) => req.cookies.token,
+
+  cookieName: 'csrf-token',
+
+  cookieOptions: {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: false,
+    path: '/'
+  },
+
+  getCsrfTokenFromRequest: (req) =>
+    req.headers['x-csrf-token']
+});
+
+// Endpoint to generate a CSRF token
+app.get('/api/csrf-token', requireAuth, (req, res) => {
+  const csrfToken = generateCsrfToken(req, res);
+  res.json({ csrfToken });
+});
+
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 
 app.use('/api/auth', authRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/users', userRoutes);
-app.use('/api/maintenance', maintenanceRoutes);
+app.use('/api/maintenance', doubleCsrfProtection , maintenanceRoutes);
 
 // Not found
 app.use((req, res) => {

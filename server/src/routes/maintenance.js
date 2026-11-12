@@ -7,6 +7,7 @@ import {
   updateRequest,
   deleteRequest
 } from '../controllers/maintenanceController.js';
+import { rateLimit } from 'express-rate-limit';
 
 const router = Router();
 
@@ -20,6 +21,19 @@ const router = Router();
 //   2. DoS — there is no rate limiting anywhere, so the public list endpoint
 //      (and the writes) can be flooded with unlimited requests to exhaust the
 //      server.
+
+const maintenanceLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 20,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: {
+    message: 'Too many requests. Please try again later.'
+  }
+});
+
+router.use(maintenanceLimiter);
+
 router.get('/', getAllRequests);
 router.get('/:id', getRequest);
 router.post('/', requireAuth, createRequest);
