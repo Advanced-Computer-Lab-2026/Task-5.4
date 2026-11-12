@@ -28,10 +28,12 @@ const mongod = await MongoMemoryServer.create();
 process.env.MONGO_URI = mongod.getUri('attack-sim');
 
 const { default: app } = await import('../server/src/app.js');
+const { connectDB } = await import('../server/src/config/db.js');
 const API = 'http://localhost:4000';
 await new Promise((resolve) => {
   http.createServer(app).listen(4000, resolve);
 });
+await connectDB(); // same boot sequence as server/src/index.js
 console.log(`[sim] real API is up on ${API} (in-memory MongoDB)`);
 
 // A faithful stand-in for attacker/public/index.html, served the same way.
