@@ -1,5 +1,6 @@
-import dotenv from 'dotenv';
-dotenv.config();
+// Must be the first import: ESM imports are hoisted, so a later
+// `dotenv.config()` call would run after app.js and its middleware load.
+import 'dotenv/config';
 import app from './app.js';
 import { connectDB } from './config/db.js';
 
