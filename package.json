@@ -22,7 +22,6 @@
   },
   "config": {
     "mongodbMemoryServer": {
-      "systemBinary": "C:/Program Files/MongoDB/Server/8.2/bin/mongod.exe",
       "version": "8.2.2"
     }
   },
