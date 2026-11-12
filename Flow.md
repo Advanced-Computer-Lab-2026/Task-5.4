@@ -1,5 +1,27 @@
 # Flow — Simulating the CSRF and DoS Attacks
 
+## Expected results after the fix
+
+The steps below describe the original vulnerable behavior for comparison. In the
+fixed version, add `CSRF_SECRET` to `server/.env` (see `server/.env.example`), then
+start the app and use the same local attacker page:
+
+1. Register/login and submit a legitimate maintenance request. It should succeed.
+   The client's Network panel should show a `/api/csrf-token` GET before the write
+   and `x-csrf-token` on the write itself.
+2. Visit `http://localhost:1337` while logged in. The forged form should receive
+   **403**, and refreshing the app should show no new forged request.
+3. Click "Claim my prize". Once the shared 30-per-minute maintenance budget is
+   exhausted, requests should receive **429** with `Retry-After`. The app on the
+   same IP also shares this budget; wait for the window to reset before continuing.
+4. Confirm normal maintenance reads/writes work again after the window resets.
+
+The automated suite reproduces the form submission and flood against a temporary
+database and passes. A visual browser replay was not completed in this environment
+because the browser automation connection was unavailable.
+
+---
+
 This project ships a **deliberately vulnerable** feature: **Maintenance Requests**
 (`/maintenance`). Any logged-in resident can file a request to fix something in a room.
 Two things are wrong with it:
@@ -30,6 +52,7 @@ Create `server/.env` (if missing):
 PORT=4000
 MONGO_URI=<your MongoDB connection string>
 JWT_SECRET=<any long random string>
+CSRF_SECRET=<a different long random string>
 JWT_EXPIRES_IN=7d
 ```
 

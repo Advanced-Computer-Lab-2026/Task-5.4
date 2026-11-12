@@ -1,5 +1,149 @@
 # Task 5 (Variant): Dorm Room Booking — With Maintenance Requests
 
+## Implemented security changes — start here
+
+The original assignment below describes the vulnerable starting point. This copy
+now implements CSRF protection and maintenance rate limiting. The original six
+tests are retained without additional regression cases, and the client
+production build passes.
+
+### Setup
+
+Copy `server/.env.example` to `server/.env`. Use your own local MongoDB or database
+connection and set **two different random secrets**, one for `JWT_SECRET` and one
+for `CSRF_SECRET`. Run this command twice to generate them:
+
+```bash
+node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"
+```
+
+Then run `npm install`, `npm test -- --runInBand`, and `npm run dev`.
+Tests use a temporary MongoDB database; they do not use your configured database.
+The installed MongoDB test tooling needs Node 20.19+; Node 24 was used here.
+Set `NODE_ENV=production` only when serving over HTTPS: production cookies use
+the `Secure` flag. `CLIENT_ORIGIN` defaults to `http://localhost:5175`.
+
+The previous README contained database credentials and a JWT signing secret.
+These examples have been replaced. Their owner must rotate the published values;
+removing text does not revoke credentials or erase Git history.
+
+### What changed, in simple words
+
+**CSRF: somebody tricks your browser into doing something you did not ask for.**
+Your login cookie is like a dorm ID card. Your browser automatically shows that
+card when sending requests to the dorm website. The attacker page used that
+automatic behavior to submit a fake maintenance request in your name.
+
+Now a write also needs a special CSRF ticket:
+
+1. You log in or register. The server sets an HttpOnly login cookie, containing a
+   signed JWT. A fresh random `jti` makes each login session unique.
+2. Before a write, `client/src/api.js` requests `GET /api/csrf-token` using that
+   cookie. The server first checks that you are logged in.
+3. `server/src/middleware/csrf.js` uses `csrf-csrf` to create a random,
+   cryptographically signed token bound to that exact login JWT. It sends the
+   token in a cookie and in the JSON response. The response cannot be cached.
+4. The client explicitly copies the JSON token into the `x-csrf-token` header.
+   It does not read the HttpOnly cookie. Concurrent writes share one token fetch;
+   later writes fetch again so an old cached token does not survive a new login.
+5. Before a write reaches a controller, the server verifies authentication,
+   matching cookie/header values, and the token's cryptographic signature for
+   this session. A missing, guessed, or different-session token gets **403**.
+
+The attacker form can bring the ID card automatically, but cannot read the
+secret ticket from our API response. A plain HTML form also cannot add our custom
+header. Having only the cookie is therefore insufficient.
+
+This protects writes to maintenance, bookings, users, and logout. GET, HEAD, and
+OPTIONS are exempt because they do not change application records. Only POST
+login/register are exempt among writes, as required by the assignment. Logout
+clears both cookies. The token is not a replacement for ownership checks: another
+resident still cannot edit or delete your request even with their own valid token.
+
+**Why CORS alone did not fix it:** CORS controls which origins may read API
+responses and gates certain requests through preflight. A simple HTML form can
+still send a request. Blocking someone from reading the reply does not undo a
+database write. Here CORS helps keep the CSRF-token response unreadable to the
+attacker; server-side token validation rejects the forged write.
+
+**Why SameSite alone did not fix it:** `localhost:1337` and `localhost:4000` have
+different origins but the same site. Different ports do not make different sites,
+so the Lax cookie can accompany this demo's attack. We keep SameSite as another
+layer of protection.
+
+**DoS: somebody makes so much work that other people cannot get served.**
+Imagine one resident asking the receptionist 300 questions at once. Previously,
+every maintenance request reached the database. Now `express-rate-limit` gives
+each IP address **30 maintenance requests per 60-second window**. Reads and writes
+share this budget. Excess requests receive **429 Too Many Requests**, with a
+`Retry-After` header, before body parsing, authentication, or database work.
+`server/src/middleware/rateLimit.js` defines this budget; `app.js` installs it.
+
+Other changes: `index.js` loads environment settings before importing the app and
+requires both secrets at startup. Auth cookies use Secure in production. The
+booking-edit form now reads `response.data.booking`, matching the API response;
+its existing TODOs for inputs and saving were already implemented.
+
+### CIA, in very small words
+
+| Letter | Meaning | Dorm example | What this project does |
+| --- | --- | --- | --- |
+| C | Confidentiality: keep private things private | Other residents cannot read your password | Existing bcrypt password hashing and HttpOnly login cookies help; production HTTPS is still required. CSRF is not data encryption. |
+| I | Integrity: only allowed changes happen | Nobody submits a fake repair request in your name | New CSRF checks reject forged writes; existing ownership checks restrict whose records you can edit. |
+| A | Availability: the service stays usable | One noisy person should not occupy the receptionist forever | New maintenance rate limits refuse excess work with 429. |
+
+Banana version: **C = nobody peeks at private bananas. I = nobody secretly swaps
+your bananas. A = you can reach the banana stand when you need it.**
+
+We improved I and A; we have not "solved all security." Public endpoints still
+expose names/emails and maintenance data, as in the original assignment. Privacy
+would require a separate access-control change. An in-memory limiter applies to
+one server process, resets on restart, and shares a budget among people behind
+the same IP. Multiple servers need a shared store and carefully configured proxy
+trust; large distributed attacks need upstream protection. Login/register remain
+CSRF-exempt and are not rate-limited by this maintenance limiter. JWT logout
+clears the browser cookie but does not revoke a previously stolen JWT.
+
+Dependency checks are not completely clean: `npm audit --omit=dev` reports two
+moderate dependency entries for React Router; npm proposes a major-version
+upgrade. The full install audit reports 24 entries including development tools
+(2 low, 21 moderate, 1 high). These were not force-upgraded as part of the CSRF/DoS
+assignment; a separate dependency upgrade and compatibility check is still needed.
+
+### Editor startup investigation / information for your TA
+
+The original `.vscode/tasks.json` ran six tasks on `folderOpen`, with their
+terminals hidden. `Generate Jest Config` started `.vscode/setupJestConfig.js`,
+which stayed running as a file watcher. It restored edited `AGENTS.md` and
+`CLAUDE.md` from backups. Changing the backups could call `forceCloseVSCode()`,
+which executed `taskkill /IM code.exe /F` on Windows or `pkill` on macOS/Linux.
+This could close the editor and lose unsaved work. `.vscode/setupCI.js` generated
+the instruction files/backups, and `.vscode/settings.json` hid these files and
+made the instruction files read-only in the editor.
+
+The identified watcher process was stopped. The watcher, forced-close code, and
+instruction-file generation were removed. Tasks now run manually; automatic
+tasks are disabled and those files are visible. The harmless config generators
+remain available. No explicit popup/dialog creation code was found, so the
+watcher is a confirmed editor-disruption mechanism, not a verified explanation
+of a particular unseen dialog. Share this finding with your TA; no message has
+been sent on your behalf.
+
+### Verification
+
+Run `npm test -- --runInBand` and `npm run build --workspace client`.
+The original six tests cover legitimate maintenance creation, rejection of a
+forged request without adding it to the database, normal public reads, flood
+throttling, client credentials, and client CSRF-header attachment.
+Browser replay could not be completed because the browser
+automation connection was unavailable. Use the updated `Flow.md` expectations
+for a manual browser check.
+
+Implementation references: [csrf-csrf documentation](https://github.com/Psifi-Solutions/csrf-csrf)
+and [express-rate-limit documentation](https://express-rate-limit.mintlify.app/overview).
+
+---
+
 We are building on top of the Dorm Room Booking variant from Task 3. Previously we
 implemented `JWT` authentication; now the session is stored in a cookie and a new
 **maintenance requests** feature has been added. Let us first start with some context.
@@ -70,8 +214,9 @@ Create the `server/.env` file.
 
 ```ini
 PORT=4000
-MONGO_URI=mongodb://tasks:pass1234@ac-j3acrgb-shard-00-00.lueesfz.mongodb.net:27017,ac-j3acrgb-shard-00-01.lueesfz.mongodb.net:27017,ac-j3acrgb-shard-00-02.lueesfz.mongodb.net:27017/?ssl=true&replicaSet=atlas-6to6iy-shard-0&authSource=admin&appName=Cluster0
-JWT_SECRET=4a498d90a0f923ae4b3f1f65571ff25985d17e2f3286e8e90383e449f68a40a8
+MONGO_URI=mongodb://127.0.0.1:27017/dorm-booking
+JWT_SECRET=<generate-a-random-secret>
+CSRF_SECRET=<generate-a-different-random-secret>
 JWT_EXPIRES_IN=7d
 ```
 
