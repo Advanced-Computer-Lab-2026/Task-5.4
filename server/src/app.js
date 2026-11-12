@@ -6,6 +6,8 @@ import authRoutes from './routes/auth.js';
 import bookingRoutes from './routes/bookings.js';
 import userRoutes from './routes/users.js';
 import maintenanceRoutes from './routes/maintenance.js';
+import rateLimit from 'express-rate-limit';
+import { csrfProtection, issueCsrfToken } from './middleware/csrf.js';
 
 const app = express();
 
@@ -19,7 +21,23 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
+// DoS protection: one client may make at most 30 maintenance requests per minute.
+// Mounted BEFORE the CSRF check so rejected/forged floods are counted too.
+const maintenanceLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 30,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { message: 'Too many requests, please try again later.' }
+});
+app.use('/api/maintenance', maintenanceLimiter);
+
 app.get('/api/health', (req, res) => res.json({ ok: true }));
+
+// CSRF: token endpoint, then require the token on every state-changing request
+// (login/register are exempt inside csrfProtection).
+app.get('/api/csrf-token', issueCsrfToken);
+app.use('/api', csrfProtection);
 
 app.use('/api/auth', authRoutes);
 app.use('/api/bookings', bookingRoutes);
