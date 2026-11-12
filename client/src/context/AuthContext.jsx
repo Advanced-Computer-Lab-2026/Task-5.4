@@ -1,5 +1,17 @@
-import { createContext, useCallback, useContext, useEffect, useState } from 'react'
-import { api } from '../api'
+
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useState
+} from 'react'
+
+import {
+  api,
+  ensureCsrfToken,
+  clearCsrfToken
+} from '../api'
 
 const AuthContext = createContext(null)
 
@@ -7,36 +19,87 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
 
-  // Bootstrap the user from the httpOnly auth cookie. There is no token in
-  // localStorage anymore — the browser holds the cookie and sends it on /auth/me.
+  // Restore the existing authenticated session.
   useEffect(() => {
-    api.get('/auth/me')
-      .then(res => setUser(res.data.user || null))
-      .catch(() => setUser(null))
-      .finally(() => setLoading(false))
+    let active = true
+
+    async function restoreSession() {
+      try {
+        const res = await api.get('/auth/me')
+        const currentUser = res.data.user || null
+
+        if (currentUser) {
+          await ensureCsrfToken()
+        }
+
+        if (active) setUser(currentUser)
+      } catch (err) {
+        clearCsrfToken()
+        if (active) setUser(null)
+      } finally {
+        if (active) setLoading(false)
+      }
+    }
+
+    restoreSession()
+
+    return () => {
+      active = false
+    }
   }, [])
 
+  // Login does not require a CSRF token.
+  // After login, fetch a token for the new session.
   const login = useCallback(async (email, password) => {
-    // The server sets the auth cookie in its response; nothing to store here.
-    const res = await api.post('/auth/login', { email, password })
+    const res = await api.post('/auth/login', {
+      email,
+      password
+    })
+
+    clearCsrfToken()
+    await ensureCsrfToken()
+
     setUser(res.data.user)
   }, [])
 
-  const register = useCallback(async (name, email, password) => {
-    const res = await api.post('/auth/register', { name, email, password })
+  // Registration also creates a new authenticated session.
+  const register = useCallback(async (
+    name,
+    email,
+    password
+  ) => {
+    const res = await api.post('/auth/register', {
+      name,
+      email,
+      password
+    })
+
+    clearCsrfToken()
+    await ensureCsrfToken()
+
     setUser(res.data.user)
   }, [])
 
+  // The server must validate CSRF before clearing the cookie.
   const logout = useCallback(async () => {
-    // Ask the server to clear the auth cookie, then reset local state.
-    try { await api.post('/auth/logout') } catch { /* ignore */ }
+    await api.post('/auth/logout')
+
+    clearCsrfToken()
     setUser(null)
+
     window.location.href = '/login'
   }, [])
 
-
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        loading,
+        login,
+        register,
+        logout
+      }}
+    >
       {children}
     </AuthContext.Provider>
   )
@@ -44,6 +107,12 @@ export function AuthProvider({ children }) {
 
 export function useAuth() {
   const ctx = useContext(AuthContext)
-  if (!ctx) throw new Error('useAuth must be used within <AuthProvider>')
+
+  if (!ctx) {
+    throw new Error(
+      'useAuth must be used within <AuthProvider>'
+    )
+  }
+
   return ctx
 }
