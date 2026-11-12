@@ -6,6 +6,8 @@ import authRoutes from './routes/auth.js';
 import bookingRoutes from './routes/bookings.js';
 import userRoutes from './routes/users.js';
 import maintenanceRoutes from './routes/maintenance.js';
+import { csrfProtection, csrfTokenHandler, invalidCsrfTokenError } from './middleware/csrf.js';
+import { maintenanceLimiter } from './middleware/rateLimit.js';
 
 const app = express();
 
@@ -21,6 +23,17 @@ app.use(cookieParser());
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 
+// Rate-limit the maintenance feature before any other work is done, so a flood
+// (reads or forged writes) is refused cheaply with 429.
+app.use('/api/maintenance', maintenanceLimiter);
+
+// Issue a CSRF token (a safe GET, so it is not itself protected).
+app.get('/api/csrf-token', csrfTokenHandler);
+
+// Require a valid CSRF token on every state-changing request (POST/PUT/PATCH/
+// DELETE). Safe methods and the pre-auth login/register routes are exempt.
+app.use(csrfProtection);
+
 app.use('/api/auth', authRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/users', userRoutes);
@@ -33,6 +46,9 @@ app.use((req, res) => {
 
 // Error handler
 app.use((err, req, res, next) => {
+  if (err === invalidCsrfTokenError || err.code === 'EBADCSRFTOKEN') {
+    return res.status(403).json({ message: 'Invalid or missing CSRF token' });
+  }
   console.error(err);
   res.status(err.status || 500).json({ message: err.message || 'Server Error' });
 });
