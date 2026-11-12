@@ -1,5 +1,7 @@
 import { Router } from 'express';
 import { requireAuth } from '../middleware/auth.js';
+import { doubleCsrfProtection } from '../middleware/csrf.js';
+import { maintenanceRateLimit } from '../middleware/maintenanceRateLimit.js';
 import {
   getAllRequests,
   getRequest,
@@ -20,10 +22,11 @@ const router = Router();
 //   2. DoS — there is no rate limiting anywhere, so the public list endpoint
 //      (and the writes) can be flooded with unlimited requests to exhaust the
 //      server.
+router.use(maintenanceRateLimit);
 router.get('/', getAllRequests);
 router.get('/:id', getRequest);
-router.post('/', requireAuth, createRequest);
-router.patch('/:id', requireAuth, updateRequest);
-router.delete('/:id', requireAuth, deleteRequest);
+router.post('/', requireAuth, doubleCsrfProtection, createRequest);
+router.patch('/:id', requireAuth, doubleCsrfProtection, updateRequest);
+router.delete('/:id', requireAuth, doubleCsrfProtection, deleteRequest);
 
 export default router;
