@@ -6,6 +6,7 @@ import authRoutes from './routes/auth.js';
 import bookingRoutes from './routes/bookings.js';
 import userRoutes from './routes/users.js';
 import maintenanceRoutes from './routes/maintenance.js';
+import { csrfProtection, csrfTokenHandler } from './middleware/csrf.js';
 
 const app = express();
 
@@ -21,6 +22,13 @@ app.use(cookieParser());
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 
+// Issue a CSRF token (and its paired cookie) to our own client.
+app.get('/api/csrf-token', csrfTokenHandler);
+
+// Every state-changing request (POST/PATCH/PUT/DELETE) must carry a valid
+// x-csrf-token header. GETs and login/register are exempt.
+app.use(csrfProtection);
+
 app.use('/api/auth', authRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/users', userRoutes);
@@ -34,7 +42,7 @@ app.use((req, res) => {
 // Error handler
 app.use((err, req, res, next) => {
   console.error(err);
-  res.status(err.status || 500).json({ message: err.message || 'Server Error' });
+  res.status(err.status || err.statusCode || 500).json({ message: err.message || 'Server Error', code: err.code });
 });
 
 export default app;
