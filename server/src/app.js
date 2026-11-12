@@ -2,6 +2,9 @@ import express from 'express';
 import morgan from 'morgan';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
+import { rateLimit } from 'express-rate-limit';
+import { requireAuth } from './middleware/auth.js';
+import { generateCsrfToken, protectWrites, invalidCsrfTokenError } from './middleware/csrf.js';
 import authRoutes from './routes/auth.js';
 import bookingRoutes from './routes/bookings.js';
 import userRoutes from './routes/users.js';
@@ -21,7 +24,23 @@ app.use(cookieParser());
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 
+// One shared IP budget for all maintenance routes, before auth or database work.
+app.use('/api/maintenance', rateLimit({
+  windowMs: 60 * 1000,
+  limit: 30,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { message: 'Too many maintenance requests. Please try again in a minute.' }
+}));
+
+app.get('/api/csrf-token', requireAuth, (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.json({ csrfToken: generateCsrfToken(req, res) });
+});
+
+// The auth router exempts only login/register and protects logout itself.
 app.use('/api/auth', authRoutes);
+app.use('/api', protectWrites);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/maintenance', maintenanceRoutes);
@@ -33,6 +52,9 @@ app.use((req, res) => {
 
 // Error handler
 app.use((err, req, res, next) => {
+  if (err === invalidCsrfTokenError) {
+    return res.status(403).json({ message: 'Invalid CSRF token' });
+  }
   console.error(err);
   res.status(err.status || 500).json({ message: err.message || 'Server Error' });
 });

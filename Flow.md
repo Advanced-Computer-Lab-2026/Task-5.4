@@ -1,5 +1,13 @@
 # Flow — Simulating the CSRF and DoS Attacks
 
+> **After the security fix (12 November 2026):** the vulnerable behavior below describes
+> the original baseline. Automated replays now reject the forged form with **403** without
+> inserting a request, and throttle the flood with **429**. All maintenance
+> endpoints share a limit of **30 requests per client IP per minute**. Valid writes still
+> work when the client fetches `/api/csrf-token` and echoes it in `x-csrf-token`.
+> `npm test` now passes the **6 original tests across 3 suites**. See
+> [verification and the startup-configuration findings](docs/security-report.md).
+
 This project ships a **deliberately vulnerable** feature: **Maintenance Requests**
 (`/maintenance`). Any logged-in resident can file a request to fix something in a room.
 Two things are wrong with it:
