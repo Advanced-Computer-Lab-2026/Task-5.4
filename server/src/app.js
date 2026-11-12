@@ -6,6 +6,7 @@ import authRoutes from './routes/auth.js';
 import bookingRoutes from './routes/bookings.js';
 import userRoutes from './routes/users.js';
 import maintenanceRoutes from './routes/maintenance.js';
+import { csrfProtection, csrfTokenHandler } from './middleware/csrf.js';
 
 const app = express();
 
@@ -20,6 +21,11 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
+
+// CSRF: token endpoint, then protect every state-changing request
+// (GET and login/register are exempt inside csrfProtection).
+app.get('/api/csrf-token', csrfTokenHandler);
+app.use(csrfProtection);
 
 app.use('/api/auth', authRoutes);
 app.use('/api/bookings', bookingRoutes);

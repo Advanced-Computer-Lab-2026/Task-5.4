@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { requireAuth } from '../middleware/auth.js';
+import { maintenanceLimiter } from '../middleware/rateLimit.js';
 import {
   getAllRequests,
   getRequest,
@@ -9,6 +10,10 @@ import {
 } from '../controllers/maintenanceController.js';
 
 const router = Router();
+
+// DoS protection: throttle every maintenance endpoint per client (429 when exceeded).
+router.use(maintenanceLimiter);
+// CSRF protection is enforced globally in app.js for all non-GET requests.
 
 // Reading is public; writing requires a logged-in user.
 //
