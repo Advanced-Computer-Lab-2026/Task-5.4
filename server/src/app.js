@@ -33,9 +33,6 @@ const { generateToken, doubleCsrfProtection } = doubleCsrf({
   getTokenFromRequest: (req) => req.headers['x-csrf-token'],
 });
 
-// Apply to all state-changing routes (GET/HEAD/OPTIONS are exempt automatically)
-app.use(doubleCsrfProtection);
-
 // Client fetches this once on boot, then sends the value as x-csrf-token header
 app.get('/api/csrf-token', (req, res) => {
   res.json({ csrfToken: generateToken(req, res) });
@@ -54,10 +51,15 @@ const writeLimiter = rateLimit({
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 
+// Auth routes are intentionally exempt from CSRF — they establish the session
+// and the user has no token yet at registration / login time.
 app.use('/api/auth', authRoutes);
-app.use('/api/bookings', writeLimiter, bookingRoutes);
-app.use('/api/users', userRoutes);
-app.use('/api/maintenance', writeLimiter, maintenanceRoutes);
+
+// All other state-changing routes require a valid CSRF token (double-submit
+// cookie pattern). Auth is excluded above so register/login work without one.
+app.use('/api/bookings', doubleCsrfProtection, writeLimiter, bookingRoutes);
+app.use('/api/users', doubleCsrfProtection, userRoutes);
+app.use('/api/maintenance', doubleCsrfProtection, writeLimiter, maintenanceRoutes);
 
 // Not found
 app.use((req, res) => {
