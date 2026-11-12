@@ -23,5 +23,8 @@
   "allowScripts": {
     "@parcel/watcher@2.6.0": true,
     "mongodb-memory-server@11.3.0": true
+  },
+  "dependencies": {
+    "csrf-csrf": "^4.1.0"
   }
 }
