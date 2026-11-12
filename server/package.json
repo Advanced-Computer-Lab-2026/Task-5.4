@@ -3,7 +3,7 @@
   "type": "module",
   "version": "0.1.0",
   "scripts": {
-    "dev": "nodemon src/index.js",
+    "dev": "node --watch src/index.js",
     "start": "node src/index.js"
   },
   "dependencies": {
@@ -15,10 +15,8 @@
     "joi": "^17.12.3",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.6.0",
-    "morgan": "^1.10.0"
-  },
-  "devDependencies": {
-    "jest": "^29.7.0",
-    "nodemon": "^3.1.0"
+    "morgan": "^1.10.0",
+    "csrf-csrf": "^4.1.0",
+    "express-rate-limit": "^8.7.4"
   }
 }
