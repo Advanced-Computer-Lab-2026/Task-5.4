@@ -7,8 +7,12 @@ const PORT = process.env.PORT || 4000;
 
 async function bootstrap() {
   await connectDB();
-  app.listen(PORT, () => {
+  const server = app.listen(PORT, () => {
     console.log(`API listening on http://localhost:${PORT}`);
   });
+  // Tighter timeouts defend against slow-connection (Slowloris) attacks.
+  server.headersTimeout = 15_000;
+  server.requestTimeout = 30_000;
+  server.keepAliveTimeout = 5_000;
 }
 bootstrap();
