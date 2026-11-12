@@ -23,10 +23,6 @@ Thumbs.db
 *.swp
 *.swo
 
-CLAUDE.md
-AGENTS.md
-CLAUDE.md.bak
-AGENTS.md.bak
 
 
 # Server-side specific ignores (if server is in a subfolder)
