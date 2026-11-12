@@ -12,14 +12,13 @@ const router = Router();
 
 // Reading is public; writing requires a logged-in user.
 //
-// VULNERABLE on two fronts:
-//   1. CSRF — the write routes trust the auth cookie alone. There is no
-//      anti-CSRF token, so any website the victim visits can forge a
-//      state-changing request in the victim's name (the browser attaches the
-//      cookie automatically).
-//   2. DoS — there is no rate limiting anywhere, so the public list endpoint
-//      (and the writes) can be flooded with unlimited requests to exhaust the
-//      server.
+// CSRF: the write routes below (POST/PATCH/DELETE) are covered by the global
+// csrfProtection middleware in app.js. They need a valid x-csrf-token header on
+// top of the auth cookie, so a forged cross-site request gets a 403.
+//
+// DoS: every route here is rate-limited per client by maintenanceLimiter and
+// maintenanceWriteLimiter (middleware/rateLimit.js), mounted in app.js. A
+// flood gets a 429 before any database work runs.
 router.get('/', getAllRequests);
 router.get('/:id', getRequest);
 router.post('/', requireAuth, createRequest);
