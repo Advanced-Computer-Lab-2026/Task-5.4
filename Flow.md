@@ -1,18 +1,15 @@
 # Flow — Simulating the CSRF and DoS Attacks
 
-This project ships a **deliberately vulnerable** feature: **Maintenance Requests**
-(`/maintenance`). Any logged-in resident can file a request to fix something in a room.
-Two things are wrong with it:
+This project includes a **Maintenance Requests** feature (`/maintenance`). Any logged-in
+resident can file a request to fix something in a room. The feature is protected against:
 
-1. **CSRF (Cross-Site Request Forgery).** The app authenticates every request with a
-   **JWT stored in an httpOnly cookie**. The browser attaches that cookie **automatically**
-   to *every* request to the API — including requests triggered by a completely different
-   website. So an attacker's page can forge a state-changing request **in the victim's name**
-   without ever seeing their password or token.
-2. **DoS (Denial of Service).** There is **no rate limiting** anywhere, so a single client
-   can flood the endpoints with unlimited requests and exhaust the server.
+1. **CSRF (Cross-Site Request Forgery).** State-changing requests require a session-bound
+   anti-CSRF token in the `x-csrf-token` header, in addition to the httpOnly auth cookie.
+2. **DoS (Denial of Service).** Maintenance routes are rate-limited per client; excess
+   requests receive `429 Too Many Requests`.
 
-Follow the steps to reproduce both, then read *Why it works*, then run the tests.
+Follow the steps to confirm both attacks are now rejected, then read *Why the protections
+work* and run the tests.
 
 ---
 
@@ -31,6 +28,7 @@ PORT=4000
 MONGO_URI=<your MongoDB connection string>
 JWT_SECRET=<any long random string>
 JWT_EXPIRES_IN=7d
+CSRF_SECRET=<a separate long random string>
 ```
 
 Start the app:
@@ -50,9 +48,9 @@ Open the client at **http://localhost:5175**.
    and note the `token` cookie. It is **HttpOnly** (JavaScript cannot read it) — but the
    browser still sends it on every request to the API.
 3. Click **Maintenance** and file a request (e.g. room `B2-104`, *plumbing*, "Leaking tap").
-   This is a legitimate action; the forged one is about to look just like it.
+   The client first fetches a CSRF token and sends it with the write request.
 
-**Leave this browser logged in.** Both attacks rely on the victim's active session.
+**Leave this browser logged in.** The attack simulations rely on the victim's active session.
 
 ---
 
@@ -83,13 +81,12 @@ It looks like a harmless "You won a prize!" page. But on load it **auto-submits 
 form** that POSTs to `http://localhost:4000/api/maintenance` with a forged request
 (`description=Forged by attacker via CSRF`), targeting a hidden iframe so you see nothing.
 
-Now go back to the app tab and **refresh the Maintenance page**. A request you never made —
-`Forged by attacker via CSRF` for room `Z9-666` — is now filed **in your name**. The server
-could not tell it apart from a real click.
+The forged form does not include the `x-csrf-token` header. The API rejects it with **403**.
+Go back to the app tab and refresh Maintenance to confirm the forged request was not filed.
 
-> Want to watch it happen? Open DevTools → **Network** on the attacker page before it loads,
-> and you will see the cross-site `POST` to `/api/maintenance` return `201`, with your
-> `token` cookie attached under **Request Headers → Cookie**.
+> Want to watch the rejection? Open DevTools → **Network** on the attacker page before it
+> loads. The cross-site `POST` to `/api/maintenance` carries the auth cookie but lacks a valid
+> CSRF token, so it returns **403**.
 
 ---
 
@@ -99,27 +96,25 @@ Still on `http://localhost:1337`, click **"Claim my prize"**. The page fires **h
 `fetch` requests** at `http://localhost:4000/api/maintenance` straight from the victim's
 browser.
 
-Open DevTools → **Network** and watch: every request returns `200` and is served in full.
-There is nothing stopping one client (or a crowd of victims lured to this page) from
-hammering the API until it falls over. **No request is ever refused.**
+Open DevTools → **Network** and watch: requests initially succeed, then the maintenance
+rate limiter refuses excess requests with **429 Too Many Requests**.
 
 ---
 
-## 5. Why it works (the vulnerable code path)
+## 5. Why the protections work
 
 **CSRF**
 
-1. **Auth is a cookie the browser sends for you** — `server/src/middleware/auth.js` reads the
-   JWT from `req.cookies.token`. The victim's browser attaches it to the attacker's forged
-   request automatically; the server cannot tell the difference between that and a real click.
-2. **The write trusts the cookie alone** — `server/src/routes/maintenance.js` guards `POST /`
-   with only `requireAuth`. There is **no proof the request came from our own app**: no
-   anti-CSRF token.
-3. **The body is a plain form** — `server/src/app.js` parses `urlencoded` bodies, so a bare
-   HTML `<form>` POST (which needs no JavaScript and triggers no CORS preflight) is enough.
-4. **CORS does not save you.** CORS only blocks the attacker from *reading* the response; the
-   browser still *sends* the request and the server still *acts on it*. CSRF is about the
-   write succeeding, not about reading the reply.
+1. **The auth cookie is still sent automatically** — `server/src/middleware/auth.js` reads the
+   JWT from `req.cookies.token`. The attacker may cause a browser request to carry it, but the
+   request is not accepted without a valid CSRF token.
+2. **The token is session-bound** — `GET /api/csrf-token` uses `csrf-csrf` to issue the token
+   in a response body and an httpOnly cookie. The client returns the token in a header; a
+   cross-site HTML form cannot set that header or read the token.
+3. **CORS does not save you by itself.** CORS only blocks the attacker from *reading* the
+   response; the browser still *sends* the request and the server still *acts on it*. CSRF is
+   about the write succeeding, not about reading the reply. The CSRF token supplies the
+   missing proof of intent.
 
 > ### Why `SameSite` doesn't save you here
 > The auth cookie is `SameSite=Lax`. You might expect that to block a cross-site POST — and
@@ -131,14 +126,11 @@ hammering the API until it falls over. **No request is ever refused.**
 
 **DoS**
 
-5. **No rate limiting** — `server/src/routes/maintenance.js` applies no limiter, so
-   `maintenanceController.getAllRequests` runs for *every* request, no matter how many arrive
-   from one client in how short a time. Each one hits the database.
+`express-rate-limit` limits maintenance requests to 30 per client per minute. Requests above
+the cap are rejected with `429` before reaching the maintenance controller.
 
-The fixes: require a secret, per-session **CSRF token** on every state-changing request (a
-value the attacker's site cannot read or guess), and **rate-limit** the feature so a flood is
-refused with `429`. The solution project does this with the `csrf-csrf` and
-`express-rate-limit` packages.
+Login and registration are exempt because no authenticated session exists yet; safe methods
+(`GET`, `HEAD`, `OPTIONS`) do not change state and are also exempt.
 
 ---
 
@@ -151,14 +143,11 @@ npm install     # first time only
 npm test
 ```
 
-What to expect **in this vulnerable project**:
+Expected behavior:
 
-- The tests describe the **secure** behavior the feature *should* have: a forged request with
-  no CSRF token is rejected (server), a flood is throttled to `429` (server), and the client
-  attaches a CSRF token to mutating requests (client).
-- So here they are **expected to FAIL** (the suite is red). That red result is the starting
-  point — your job is to make them green by adding CSRF protection and rate limiting. The
-  solution project shows them all passing.
+- A forged request without a CSRF token is rejected (`403`); no data is written.
+- Repeated requests from one client are throttled (`429`).
+- The client attaches the CSRF token to mutating requests.
 
 Notes:
 
