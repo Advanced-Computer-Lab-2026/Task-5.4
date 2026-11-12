@@ -31,17 +31,17 @@ const { generateCsrfToken, doubleCsrfProtection, invalidCsrfTokenError } = doubl
 
 // Pre-auth routes run before a session exists, so there is nothing to forge
 // against (login CSRF is out of scope here). Everything else that mutates is protected.
-const EXEMPT = new Set(['/api/auth/login', '/api/auth/register']);
+const EXEMPT = new Set(['/auth/login', '/auth/register']);
 
 export function csrfProtection(req, res, next) {
-  if (EXEMPT.has(req.path) || EXEMPT.has(req.originalUrl.split('?')[0])) return next();
+  if (req.method === 'POST' && EXEMPT.has(req.path)) return next();
   return doubleCsrfProtection(req, res, next);
 }
 
 // GET /api/csrf-token
 export function issueCsrfToken(req, res) {
   const csrfToken = generateCsrfToken(req, res);
-  res.json({ csrfToken });
+  res.set('Cache-Control', 'no-store').json({ csrfToken });
 }
 
 export { invalidCsrfTokenError };
