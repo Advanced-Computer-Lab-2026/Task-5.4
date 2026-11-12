@@ -6,6 +6,8 @@ import authRoutes from './routes/auth.js';
 import bookingRoutes from './routes/bookings.js';
 import userRoutes from './routes/users.js';
 import maintenanceRoutes from './routes/maintenance.js';
+import { requireAuth } from './middleware/auth.js';
+import { doubleCsrfProtection, issueCsrfToken } from './middleware/csrf.js';
 
 const app = express();
 
@@ -20,6 +22,15 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
+
+// The SPA reads the token from this authenticated response. Its matching
+// httpOnly cookie is sent automatically, but an attacker cannot read the
+// response and therefore cannot supply the required request header.
+app.get('/api/csrf-token', requireAuth, issueCsrfToken);
+
+// Protect all state-changing routes. Safe reads and the two pre-auth routes
+// are exempted by the CSRF middleware configuration.
+app.use(doubleCsrfProtection);
 
 app.use('/api/auth', authRoutes);
 app.use('/api/bookings', bookingRoutes);
