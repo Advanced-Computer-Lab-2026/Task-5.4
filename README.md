@@ -165,8 +165,41 @@ npm install     # first time only
 npm test
 ```
 
-The `CSRF` and `DoS` tests describe the **secure** behavior and are **expected to FAIL** in this
-project (the suite is red). Your job is to make them green by applying the fix.
+The `CSRF` and `DoS` tests describe the **secure** behavior and fail in the vulnerable starter.
+With the protections below installed, the six original tests and the additional security
+regression tests should pass.
+
+### Implemented protections and verification
+
+- `GET /api/csrf-token` requires authentication and issues a signed double-submit token bound
+  to the current session JWT. Responses use `Cache-Control: no-store`. The browser keeps the
+  HttpOnly CSRF cookie, and the Axios client fetches and echoes the token in `x-csrf-token`
+  on writes. Login/register remain exempt; logout, bookings, user changes and maintenance
+  writes are protected. Invalid or missing tokens return `403` before a write occurs.
+- Every login receives a new JWT identifier. Existing CSRF cookies are cleared when a new
+  session is established and on logout, so tokens cannot be reused across sessions.
+- All maintenance routes share a limit of **30 requests per IP per minute**, enforced before
+  request bodies, authentication or database queries are processed. Excess requests return
+  `429` with rate-limit and retry headers. This mitigates a single client's flood; it is not
+  a complete defense against distributed attacks. Multiple API instances need a shared
+  rate-limit store rather than the default per-process memory store.
+- For multiple API instances, set the same cryptographically random `CSRF_SECRET` in their
+  environment. A single development process uses a random secret when it is unset. Generate
+  one with `node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"`.
+- Run `npm test` for all tests, or `npm run test:watch` to rerun all tests as files change.
+  The server project's global setup prepares MongoDB before the test hooks run, and suites
+  use one worker to avoid competing downloads and excessive database processes. The included
+  GitHub Actions workflow installs from the lockfile, runs `npm test`, and builds the client
+  on pushes and pull requests.
+
+The original `Flow.md` forged form should now receive `403` and create no data; its flood
+should receive `429` after the limit. CORS controls response access, while `SameSite` cookies
+do not separate different localhost ports; the CSRF header supplies the additional proof.
+
+The editor configuration issue described below comes from `.vscode/tasks.json` automatically
+starting `.vscode/setupJestConfig.js`. That script watches the instruction and backup files,
+restores changed instruction files, and forcibly closes VS Code if backups change or vanish.
+It is unrelated to the application's CSRF and rate-limit middleware.
 
 ### Custom Configurations
 
