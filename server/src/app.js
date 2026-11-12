@@ -6,6 +6,8 @@ import authRoutes from './routes/auth.js';
 import bookingRoutes from './routes/bookings.js';
 import userRoutes from './routes/users.js';
 import maintenanceRoutes from './routes/maintenance.js';
+import { csrfProtection, sendCsrfToken } from './middleware/csrf.js';
+import { maintenanceLimiter } from './middleware/rateLimit.js';
 
 const app = express();
 
@@ -19,12 +21,19 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
+// Anti-CSRF: every state-changing request (POST/PATCH/PUT/DELETE) must carry a
+// valid token in the `x-csrf-token` header. Safe GETs and the pre-auth routes
+// (login/register) are exempt. See middleware/csrf.js.
+app.use(csrfProtection);
+
 app.get('/api/health', (req, res) => res.json({ ok: true }));
+app.get('/api/csrf-token', sendCsrfToken);
 
 app.use('/api/auth', authRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/users', userRoutes);
-app.use('/api/maintenance', maintenanceRoutes);
+// Anti-DoS: max 20 requests per minute per client (429 after that).
+app.use('/api/maintenance', maintenanceLimiter, maintenanceRoutes);
 
 // Not found
 app.use((req, res) => {
@@ -33,6 +42,10 @@ app.use((req, res) => {
 
 // Error handler
 app.use((err, req, res, next) => {
+  // A missing/invalid CSRF token is an expected rejection, not a server bug.
+  if (err.code === 'EBADCSRFTOKEN') {
+    return res.status(403).json({ message: 'Invalid or missing CSRF token', code: 'EBADCSRFTOKEN' });
+  }
   console.error(err);
   res.status(err.status || 500).json({ message: err.message || 'Server Error' });
 });
