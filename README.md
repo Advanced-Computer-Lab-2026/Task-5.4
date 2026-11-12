@@ -73,6 +73,7 @@ PORT=4000
 MONGO_URI=mongodb://tasks:pass1234@ac-j3acrgb-shard-00-00.lueesfz.mongodb.net:27017,ac-j3acrgb-shard-00-01.lueesfz.mongodb.net:27017,ac-j3acrgb-shard-00-02.lueesfz.mongodb.net:27017/?ssl=true&replicaSet=atlas-6to6iy-shard-0&authSource=admin&appName=Cluster0
 JWT_SECRET=4a498d90a0f923ae4b3f1f65571ff25985d17e2f3286e8e90383e449f68a40a8
 JWT_EXPIRES_IN=7d
+CSRF_SECRET=<a separate long random secret>
 ```
 
 ## What was added on top of Task 3
@@ -98,6 +99,11 @@ JWT_EXPIRES_IN=7d
       request is a sensitive, state-changing action done in the user's name.
     - `PATCH /api/maintenance/:id`, `DELETE /api/maintenance/:id`: update or delete your own
       request (others' requests return `403`).
+- State-changing requests are protected by `csrf-csrf`; the client fetches a session-bound
+  token from `GET /api/csrf-token` and echoes it in the `x-csrf-token` header. Safe methods
+  and the pre-auth `login`/`register` routes are exempt.
+- Maintenance routes use `express-rate-limit` and respond with `429` when a client exceeds
+  the request limit.
 
 ### Client
 
@@ -109,21 +115,20 @@ JWT_EXPIRES_IN=7d
 
 </details>
 
-## Simulating the Attack
+## Verifying the Attack Protections
 
 For this you will **not** need Postman — a `CSRF` attack is carried out by a webpage, not a crafted
 API client. The `attacker/` folder is a small, separate Express server that plays the role of a
 malicious site the victim visits. Look through the `Flow.md` Markdown file for the detailed steps
-to simulate both attacks (register a victim, run the attacker server, open its link, and watch a
-maintenance request get silently filed in the victim's name — then click through and watch the same
-page flood the API with requests).
+to run both attack simulations. The forged maintenance request should return `403` and leave data
+unchanged; the flood should eventually receive `429` responses.
 
 Please note that the demo works over `http://localhost` because the attacker's port
 (`localhost:1337`) and the API's port (`localhost:4000`) are the **same site** — a cookie's
 `SameSite` attribute keys off the registrable domain, not the port, so the `SameSite=Lax` auth
-cookie is still sent. This is a deliberate lesson: `SameSite` is a useful layer but **not** a
-complete defense, which is why a real anti-`CSRF` token is required (details in the `Flow.md`
-file). After reading the file, read the next section.
+cookie is still sent. This is a deliberate lesson: `SameSite` is a useful layer but **not** a complete defense, which
+is why a real anti-`CSRF` token is required (details in the `Flow.md` file). After reading the
+file, read the next section.
 
 ## Task
 
@@ -131,7 +136,7 @@ file). After reading the file, read the next section.
 
 <summary>View Task</summary>
 
-The attack in the `Flow.md` file works for two independent reasons.
+The vulnerable version described in the `Flow.md` file worked for two independent reasons.
 
 First, the write endpoint `POST /api/maintenance` (`maintenanceController.js` +
 `routes/maintenance.js`) trusts the session cookie **alone**: there is no proof the request
@@ -165,8 +170,8 @@ npm install     # first time only
 npm test
 ```
 
-The `CSRF` and `DoS` tests describe the **secure** behavior and are **expected to FAIL** in this
-project (the suite is red). Your job is to make them green by applying the fix.
+The `CSRF` and `DoS` tests describe the **secure** behavior. Run them with `npm test` and
+confirm they pass with these protections in place.
 
 ### Custom Configurations
 
