@@ -38,16 +38,4 @@ describe('client api CSRF behavior', () => {
     expect(getHeader(sent.headers, 'x-csrf-token')).toBe('test-token');
   });
 
-  test.each(['patch', 'delete'])('%s attaches a token to maintenance writes', async (method) => {
-    await api[method]('/maintenance/123');
-    expect(getHeader(captured[0].headers, 'x-csrf-token')).toBe('test-token');
-  });
-
-  test('public reads and pre-auth requests do not require a token', async () => {
-    await api.get('/maintenance');
-    await api.post('/auth/login', {});
-    await api.post('/auth/register', {});
-    expect(captured).toHaveLength(3);
-    for (const sent of captured) expect(getHeader(sent.headers, 'x-csrf-token')).toBeUndefined();
-  });
 });

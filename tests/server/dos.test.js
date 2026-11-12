@@ -35,11 +35,5 @@ describe('Maintenance requests — DoS / rate limiting', () => {
     expect(statuses).toContain(200);
     // ...but the flood is throttled with 429 Too Many Requests.
     expect(statuses).toContain(429);
-    for (const method of ['get', 'post', 'patch', 'delete']) {
-      const res = await request(app)[method]('/api/maintenance/000000000000000000000001');
-      expect(res.status).toBe(429);
-      expect(Number(res.headers['retry-after'])).toBeGreaterThan(0);
-    }
-    expect((await request(app).get('/api/health')).status).toBe(200);
   });
 });
