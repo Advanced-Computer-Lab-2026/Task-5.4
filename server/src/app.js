@@ -6,8 +6,13 @@ import authRoutes from './routes/auth.js';
 import bookingRoutes from './routes/bookings.js';
 import userRoutes from './routes/users.js';
 import maintenanceRoutes from './routes/maintenance.js';
+import { generateCsrfToken, csrfProtection } from './middleware/csrf.js';
+import { maintenanceLimiter } from './middleware/rateLimit.js';
 
 const app = express();
+
+// Don't advertise the framework (removes the "X-Powered-By: Express" header).
+app.disable('x-powered-by');
 
 app.use(morgan('dev'));
 // CORS is locked to the client origin with credentials enabled so the browser
@@ -21,10 +26,20 @@ app.use(cookieParser());
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 
+// Hands our own client a CSRF token (and sets its paired cookie). A cross-site
+// attacker cannot read this response, so it can never learn the token.
+app.get('/api/csrf-token', (req, res) => {
+  res.json({ csrfToken: generateCsrfToken(req, res) });
+});
+
+// Require a valid CSRF token on every state-changing request.
+// Safe methods (GET/HEAD/OPTIONS) and login/register are exempt.
+app.use(csrfProtection);
+
 app.use('/api/auth', authRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/users', userRoutes);
-app.use('/api/maintenance', maintenanceRoutes);
+app.use('/api/maintenance', maintenanceLimiter, maintenanceRoutes);
 
 // Not found
 app.use((req, res) => {
@@ -34,7 +49,7 @@ app.use((req, res) => {
 // Error handler
 app.use((err, req, res, next) => {
   console.error(err);
-  res.status(err.status || 500).json({ message: err.message || 'Server Error' });
+  res.status(err.status || err.statusCode || 500).json({ message: err.message || 'Server Error' });
 });
 
 export default app;
