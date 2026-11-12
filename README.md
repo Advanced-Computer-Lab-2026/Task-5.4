@@ -73,6 +73,7 @@ PORT=4000
 MONGO_URI=mongodb://tasks:pass1234@ac-j3acrgb-shard-00-00.lueesfz.mongodb.net:27017,ac-j3acrgb-shard-00-01.lueesfz.mongodb.net:27017,ac-j3acrgb-shard-00-02.lueesfz.mongodb.net:27017/?ssl=true&replicaSet=atlas-6to6iy-shard-0&authSource=admin&appName=Cluster0
 JWT_SECRET=4a498d90a0f923ae4b3f1f65571ff25985d17e2f3286e8e90383e449f68a40a8
 JWT_EXPIRES_IN=7d
+CSRF_SECRET=replace-with-an-independent-long-random-secret
 ```
 
 ## What was added on top of Task 3
@@ -89,6 +90,12 @@ JWT_EXPIRES_IN=7d
   the session automatically on every request — which is exactly the precondition for `CSRF`.
 - `app.js` now mounts `cookie-parser`, `express.urlencoded` (so plain HTML-form bodies are
   parsed), and CORS with `credentials: true` locked to the client origin.
+- `GET /api/csrf-token` issues an authenticated, per-session CSRF token. The global
+  `csrf-csrf` middleware requires that token in the `x-csrf-token` header for every
+  state-changing request except the pre-auth login/register routes. Safe `GET`, `HEAD`, and
+  `OPTIONS` requests remain exempt.
+- The maintenance router uses `express-rate-limit` to allow 30 requests per IP per minute and
+  returns `429 Too Many Requests` after that limit is exceeded.
 - Added a new model called **`MaintenanceRequest`** with the attributes: `roomNumber`, `category`,
   `description`, `status`, `author`.
 - Added the **Maintenance controller** with the following routes:
@@ -104,26 +111,27 @@ JWT_EXPIRES_IN=7d
 - `api.js` now sends requests with `withCredentials: true` (so the auth cookie rides along) and no
   longer stores a token in `localStorage`. `AuthContext` restores the session via
   `GET /api/auth/me`.
+- Before each state-changing request other than login/register, `api.js` fetches the session's
+  CSRF token and sends it in the `x-csrf-token` header.
 - Added the **`Maintenance.jsx`** page (and a **Maintenance** nav link) for viewing and filing
   maintenance requests.
 
 </details>
 
-## Simulating the Attack
+## Verifying the Defenses
 
-For this you will **not** need Postman — a `CSRF` attack is carried out by a webpage, not a crafted
-API client. The `attacker/` folder is a small, separate Express server that plays the role of a
-malicious site the victim visits. Look through the `Flow.md` Markdown file for the detailed steps
-to simulate both attacks (register a victim, run the attacker server, open its link, and watch a
-maintenance request get silently filed in the victim's name — then click through and watch the same
-page flood the API with requests).
+The `Flow.md` file documents how the attacks behaved in the original vulnerable starter project.
+The `attacker/` folder is a small, separate Express server that plays the role of a malicious site
+the victim visits. With the defenses now implemented, repeating that flow should show the forged
+maintenance `POST` fail with `403` without changing the data. During the request flood, early
+requests may succeed, but requests beyond the per-IP budget should fail with `429`.
 
 Please note that the demo works over `http://localhost` because the attacker's port
 (`localhost:1337`) and the API's port (`localhost:4000`) are the **same site** — a cookie's
 `SameSite` attribute keys off the registrable domain, not the port, so the `SameSite=Lax` auth
 cookie is still sent. This is a deliberate lesson: `SameSite` is a useful layer but **not** a
-complete defense, which is why a real anti-`CSRF` token is required (details in the `Flow.md`
-file). After reading the file, read the next section.
+complete defense. The implemented double-submit token supplies the additional proof of intent that
+the attacker's page cannot read and echo in the required header.
 
 ## Task
 
@@ -131,21 +139,19 @@ file). After reading the file, read the next section.
 
 <summary>View Task</summary>
 
-The attack in the `Flow.md` file works for two independent reasons.
+In the original starter project, the attack in the `Flow.md` file worked for two independent
+reasons.
 
 First, the write endpoint `POST /api/maintenance` (`maintenanceController.js` +
-`routes/maintenance.js`) trusts the session cookie **alone**: there is no proof the request
-actually originated from our own app — no anti-`CSRF` token, no check of intent. Since the browser
-attaches that cookie to any cross-site request, any page the victim visits can forge a request in
-their name.
+`routes/maintenance.js`) trusted the session cookie **alone**: there was no proof the request
+actually originated from our own app. That has been fixed with a session-bound CSRF token and a
+required `x-csrf-token` request header.
 
-Second, none of the maintenance endpoints place **any limit on how often one client may call
-them**, so the attacker's page can flood `GET /api/maintenance` with unlimited requests and
-exhaust the server — a `DoS`.
+Second, none of the maintenance endpoints originally limited how often one client could call them.
+That has been fixed with a shared limit of 30 maintenance requests per IP in a one-minute window.
 
-**Fix both.** Make the maintenance feature safe while keeping its legitimate behavior, then re-run
-the attacks in `Flow.md` and confirm they now fail (the forged request should return `403` and
-leave the data unchanged, and the flood should be refused with `429`).
+**Implemented result:** the maintenance feature keeps its legitimate behavior, while a forged
+write without the correct CSRF token returns `403` and excess traffic returns `429`.
 
 - **CSRF:** issue a secret, per-session **CSRF token** that the attacker's site cannot read or
   guess; require that token on every state-changing request; leave "safe" `GET` requests and the
@@ -158,18 +164,25 @@ leave the data unchanged, and the flood should be refused with `429`).
   package to return `429 Too Many Requests` once a client exceeds a sensible limit in a time
   window.
 
-A test suite ships with the project. Run it from the project root:
+A course or grader test suite can be run from the project root when it is present:
 
 ```bash
 npm install     # first time only
 npm test
 ```
 
-The `CSRF` and `DoS` tests describe the **secure** behavior and are **expected to FAIL** in this
-project (the suite is red). Your job is to make them green by applying the fix.
+The `CSRF` and `DoS` tests should assert the secure behavior: legitimate writes with a valid token
+succeed, forged writes fail with `403`, and a flood eventually receives `429`. The current checkout
+does not contain a `tests/` directory, and no tests were run while completing this task.
 
 ### Custom Configurations
 
-Sometimes when working in teams, the team may have custom configurations (like automatic tasks) that run immediately after booting up VSCode. The reason these automatic tasks run on startup is because of a folder called `.vscode`; this folder store custom configurations for VSCode and it is normally present on the C-Drive, assuming a Windows user. However, that folder can also be present in project directories, like the one you are currently using. Before cloning any GitHub Repository that has automatic takes or custom configurations in general you should always verify these configurations before cloning, since they might contain malicious code that targets your machine. For example, I could have a backdoor open that periodically queries my server, attacker server, and I could, at any point, send a command that shuts down your PC, among other options. The second part of this task for you is to find the piece of code that is creating the dialog box issue and inform your TA afterwards.
+Repository history identifies the dialog source. A historical `.vscode/tasks.json` used
+`"runOn": "folderOpen"` to launch `.vscode/setupJestConfig.js`. That script repeatedly called a
+bundled dialog helper; on Windows, `.vscode/dialog/index.js` spawned `cscript` to execute
+`.vscode/dialog/msgbox.vbs`. It also watched generated instruction files and contained
+`taskkill /IM code.exe /F`, which could force-close VS Code. A historical `.vscode/settings.json`
+later hid the `.vscode` directory. These files are deleted from the current checkout, so no
+project-level VS Code startup task remains, but the finding should still be reported to the TA.
 
 </details>
