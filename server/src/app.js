@@ -22,7 +22,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
 // CSRF protection configuration
-const { generateToken, doubleCsrfProtection } = doubleCsrf({
+const { generateCsrfToken, doubleCsrfProtection } = doubleCsrf({
   getSecret: () => process.env.CSRF_SECRET || process.env.JWT_SECRET,
 
   // Bind the CSRF token to the user's authenticated session
@@ -35,7 +35,7 @@ const { generateToken, doubleCsrfProtection } = doubleCsrf({
   ignoredMethods: ['GET', 'HEAD', 'OPTIONS'],
 
   // The client sends its CSRF token in this header
-  getTokenFromRequest: (req) => req.headers['x-csrf-token']
+  getCsrfTokenFromRequest: (req) => req.headers['x-csrf-token']
 });
 
 app.use((req, res, next) => {
@@ -53,7 +53,7 @@ app.use((req, res, next) => {
 // Endpoint used by the legitimate client to obtain a CSRF token
 app.get('/api/csrf-token', (req, res) => {
   res.json({
-    csrfToken: generateToken(req, res)
+    csrfToken: generateCsrfToken(req, res)
   });
 });
 
