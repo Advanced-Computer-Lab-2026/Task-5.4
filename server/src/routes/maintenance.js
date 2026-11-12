@@ -7,23 +7,20 @@ import {
   updateRequest,
   deleteRequest
 } from '../controllers/maintenanceController.js';
+import { maintenanceReadLimiter, maintenanceWriteLimiter } from '../middleware/rateLimit.js';
 
 const router = Router();
 
 // Reading is public; writing requires a logged-in user.
 //
-// VULNERABLE on two fronts:
-//   1. CSRF — the write routes trust the auth cookie alone. There is no
-//      anti-CSRF token, so any website the victim visits can forge a
-//      state-changing request in the victim's name (the browser attaches the
-//      cookie automatically).
-//   2. DoS — there is no rate limiting anywhere, so the public list endpoint
-//      (and the writes) can be flooded with unlimited requests to exhaust the
-//      server.
-router.get('/', getAllRequests);
-router.get('/:id', getRequest);
-router.post('/', requireAuth, createRequest);
-router.patch('/:id', requireAuth, updateRequest);
-router.delete('/:id', requireAuth, deleteRequest);
+// CSRF: write routes are protected by the global doubleCsrfProtection mounted
+// in app.js before this router.
+// DoS: every route is rate-limited per client. The limiter runs first so a
+// flood is rejected with 429 before any auth check or database query.
+router.get('/', maintenanceReadLimiter, getAllRequests);
+router.get('/:id', maintenanceReadLimiter, getRequest);
+router.post('/', maintenanceWriteLimiter, requireAuth, createRequest);
+router.patch('/:id', maintenanceWriteLimiter, requireAuth, updateRequest);
+router.delete('/:id', maintenanceWriteLimiter, requireAuth, deleteRequest);
 
 export default router;
