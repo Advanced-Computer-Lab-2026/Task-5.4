@@ -4,6 +4,10 @@ We are building on top of the Dorm Room Booking variant from Task 3. Previously 
 implemented `JWT` authentication; now the session is stored in a cookie and a new
 **maintenance requests** feature has been added. Let us first start with some context.
 
+This checkout includes the assignment fix. The background and demo below
+describe the starter app. Run `npm test` to verify the fixed behavior against
+an isolated, in-memory MongoDB instance.
+
 ## Context
 
 ### Cross-Site Request Forgery (CSRF)
@@ -61,8 +65,7 @@ can.
 ## Running it
 
 ```bash
-npm install           # Install concurrently and the dependencies of the projects
-npm run install:all   # For safety
+npm ci                # Install the root and workspace dependencies
 npm run dev           # API on :4000, client on :5175
 ```
 
@@ -70,10 +73,29 @@ Create the `server/.env` file.
 
 ```ini
 PORT=4000
-MONGO_URI=mongodb://tasks:pass1234@ac-j3acrgb-shard-00-00.lueesfz.mongodb.net:27017,ac-j3acrgb-shard-00-01.lueesfz.mongodb.net:27017,ac-j3acrgb-shard-00-02.lueesfz.mongodb.net:27017/?ssl=true&replicaSet=atlas-6to6iy-shard-0&authSource=admin&appName=Cluster0
-JWT_SECRET=4a498d90a0f923ae4b3f1f65571ff25985d17e2f3286e8e90383e449f68a40a8
+MONGO_URI=mongodb://127.0.0.1:27017/dormbooking
+JWT_SECRET=replace-with-a-random-secret
+CSRF_SECRET=replace-with-a-different-random-secret
 JWT_EXPIRES_IN=7d
 ```
+
+Use a locally running MongoDB for development. Set distinct random values for
+`JWT_SECRET` and `CSRF_SECRET`.
+
+The API issues a session-bound token at `GET /api/csrf-token`. The client sends
+it in `X-CSRF-Token` alongside the cookies on authenticated writes. CORS
+controls whether another origin can read the response, and SameSite can
+still allow cookies between different ports on the same site. The token
+check is what rejects a write sent with the session cookie alone.
+
+Maintenance routes share a limit of 30 requests per minute per client IP in
+each server process. Above the limit, the API returns `429` and `Retry-After`.
+
+The VS Code startup issue originated in the starter's
+[`setupJestConfig.js`](https://github.com/Advanced-Computer-Lab-2026/Task-5.4/blob/f0cc02205e020eabdb206460d4f86fbc777cc8c6/.vscode/setupJestConfig.js#L12-L25):
+a folder-open task started file watchers that could force-close VS Code when
+the generated backup files changed or were missing. This checkout removes the
+startup tasks and checks in the test files and configuration directly.
 
 ## What was added on top of Task 3
 
