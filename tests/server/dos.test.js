@@ -1,22 +1,18 @@
 import request from 'supertest';
-import mongoose from 'mongoose';
-import { MongoMemoryServer } from 'mongodb-memory-server';
+import { resetModels } from '../helpers/memoryModels.js';
 import app from '../../server/src/app.js';
 
-let mongo;
+jest.mock('../../server/src/models/MaintenanceRequest.js', () => ({
+  MaintenanceRequest: require('../helpers/memoryModels.js').MaintenanceRequest
+}));
 
-beforeAll(async () => {
+beforeAll(() => {
   process.env.JWT_SECRET = 'test-secret';
   process.env.JWT_EXPIRES_IN = '1h';
   process.env.CSRF_SECRET = 'test-csrf-secret';
-  mongo = await MongoMemoryServer.create();
-  await mongoose.connect(mongo.getUri());
-}, 60000);
-
-afterAll(async () => {
-  await mongoose.disconnect();
-  if (mongo) await mongo.stop();
 });
+
+beforeEach(resetModels);
 
 describe('Maintenance requests — DoS / rate limiting', () => {
   test('a normal request to the public list succeeds (the happy path)', async () => {

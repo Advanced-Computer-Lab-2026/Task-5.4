@@ -187,6 +187,14 @@ npm test
 The `CSRF` and `DoS` tests describe the **secure** behavior. They failed in the
 original starter project and should pass with the maintenance protections above.
 
+The tests run without a MongoDB installation, binary download, or running database.
+Server tests exercise the real Express routes, controllers, JWT authentication,
+CSRF protection, and rate limiting using test-only in-memory persistence doubles.
+They verify application security behavior, not MongoDB schema/index behavior or
+database connectivity. The application itself still uses MongoDB normally.
+
+On Windows PowerShell, run `npm.cmd test -- --runInBand`.
+
 ### Custom Configurations
 
 Sometimes when working in teams, the team may have custom configurations (like automatic tasks) that run immediately after booting up VSCode. The reason these automatic tasks run on startup is because of a folder called `.vscode`; this folder store custom configurations for VSCode and it is normally present on the C-Drive, assuming a Windows user. However, that folder can also be present in project directories, like the one you are currently using. Before cloning any GitHub Repository that has automatic takes or custom configurations in general you should always verify these configurations before cloning, since they might contain malicious code that targets your machine. For example, I could have a backdoor open that periodically queries my server, attacker server, and I could, at any point, send a command that shuts down your PC, among other options. The second part of this task for you is to find the piece of code that is creating the dialog box issue and inform your TA afterwards.

@@ -1,22 +1,21 @@
 import request from 'supertest';
-import mongoose from 'mongoose';
-import { MongoMemoryServer } from 'mongodb-memory-server';
+import { resetModels } from '../helpers/memoryModels.js';
 import app from '../../server/src/app.js';
 
-let mongo;
+jest.mock('../../server/src/models/User.js', () => ({
+  User: require('../helpers/memoryModels.js').User
+}));
+jest.mock('../../server/src/models/MaintenanceRequest.js', () => ({
+  MaintenanceRequest: require('../helpers/memoryModels.js').MaintenanceRequest
+}));
 
-beforeAll(async () => {
+beforeAll(() => {
   process.env.JWT_SECRET = 'test-secret';
   process.env.JWT_EXPIRES_IN = '1h';
   process.env.CSRF_SECRET = 'test-csrf-secret';
-  mongo = await MongoMemoryServer.create();
-  await mongoose.connect(mongo.getUri());
-}, 60000);
-
-afterAll(async () => {
-  await mongoose.disconnect();
-  if (mongo) await mongo.stop();
 });
+
+beforeEach(resetModels);
 
 // Turn a response's Set-Cookie header into the "name=value" pairs a browser
 // would echo back in the Cookie header on the next request.
