@@ -1,9 +1,4 @@
-import fs from 'fs';
-import path from 'path';
-
-const clientTestPath = path.join(process.cwd(), 'tests', 'client', 'csrf.test.js');
-
-const clientTestContent = `import { api } from '../../client/src/api.js';
+import { api } from '../../client/src/api.js';
 
 // Read a header value whether axios stored it as a plain object or an AxiosHeaders.
 function getHeader(headers, name) {
@@ -32,6 +27,29 @@ describe('client api CSRF behavior', () => {
     expect(api.defaults.withCredentials).toBe(true);
   });
 
+  test.each(['patch', 'put', 'delete'])('%s carries a CSRF token', async method => {
+    await api[method]('/maintenance/123', {});
+    expect(getHeader(captured[0].headers, 'x-csrf-token')).toBe('test-token');
+  });
+
+  test.each(['/auth/login', '/auth/register'])('%s stays exempt', async path => {
+    await api.post(path, {});
+    expect(getHeader(captured[0].headers, 'x-csrf-token')).toBeUndefined();
+  });
+
+  test('token fetch failure prevents the write and a later attempt can recover', async () => {
+    const adapter = api.defaults.adapter;
+    api.defaults.adapter = async config => {
+      if (config.url === '/csrf-token') throw new Error('Token unavailable');
+      return adapter(config);
+    };
+    await expect(api.post('/maintenance', {})).rejects.toThrow('Token unavailable');
+    expect(captured).toHaveLength(0);
+    api.defaults.adapter = adapter;
+    await api.post('/maintenance', {});
+    expect(getHeader(captured[0].headers, 'x-csrf-token')).toBe('test-token');
+  });
+
   // A state-changing request must carry an anti-CSRF token in a header. The
   // attacker's forged request cannot set this header (and cannot read the token),
   // so this is what defeats CSRF. The vulnerable client never attaches it.
@@ -43,9 +61,3 @@ describe('client api CSRF behavior', () => {
     expect(getHeader(sent.headers, 'x-csrf-token')).toBe('test-token');
   });
 });
-`;
-
-if (!fs.existsSync(clientTestPath)) {
-  fs.mkdirSync(path.dirname(clientTestPath), { recursive: true });
-  fs.writeFileSync(clientTestPath, clientTestContent, { encoding: 'utf8' });
-}
