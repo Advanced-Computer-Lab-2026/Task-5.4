@@ -17,16 +17,17 @@ afterEach(() => {
   jest.restoreAllMocks();
 });
 
-describe('Maintenance security', () => {
-  test('leaves login and registration exempt before a session exists', async () => {
-    const login = await request(app).post('/api/auth/login').send({});
-    const register = await request(app).post('/api/auth/register').send({});
-
-    expect(login.status).toBe(400);
-    expect(register.status).toBe(400);
+describe('Security behavior', () => {
+  test('sends requests with credentials so the auth cookie is included', () => {
+    expect(api.defaults.withCredentials).toBe(true);
   });
 
   test('allows an authenticated maintenance write with a CSRF token', async () => {
+    const login = await request(app).post('/api/auth/login').send({});
+    const register = await request(app).post('/api/auth/register').send({});
+    expect(login.status).toBe(400);
+    expect(register.status).toBe(400);
+
     const cookie = authCookie();
     const tokenRes = await request(app)
       .get('/api/csrf-token')
@@ -62,7 +63,19 @@ describe('Maintenance security', () => {
     expect(createRequest).not.toHaveBeenCalled();
   });
 
-  test('rate-limits repeated maintenance reads', async () => {
+  test('allows a normal request to the public maintenance list', async () => {
+    jest.spyOn(MaintenanceRequest, 'find').mockImplementation(() => ({
+      populate() { return this; },
+      sort() { return this; },
+      lean() { return Promise.resolve([]); }
+    }));
+
+    const res = await request(app).get('/api/maintenance');
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.requests)).toBe(true);
+  });
+
+  test('rate-limits a flood of maintenance reads', async () => {
     jest.spyOn(MaintenanceRequest, 'find').mockImplementation(() => ({
       populate() { return this; },
       sort() { return this; },
@@ -77,9 +90,6 @@ describe('Maintenance security', () => {
     expect(statuses).toContain(200);
     expect(statuses).toContain(429);
   });
-});
-
-describe('Client CSRF behavior', () => {
   test('attaches the fetched token to a mutating request', async () => {
     const sent = [];
     api.defaults.adapter = async config => {
