@@ -6,6 +6,7 @@ import authRoutes from './routes/auth.js';
 import bookingRoutes from './routes/bookings.js';
 import userRoutes from './routes/users.js';
 import maintenanceRoutes from './routes/maintenance.js';
+import { csrfProtection, issueCsrfToken } from './middleware/csrf.js';
 
 const app = express();
 
@@ -21,6 +22,16 @@ app.use(cookieParser());
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 
+// Issue a per-session CSRF token and set the double-submit cookie.
+app.get('/api/csrf-token', (req, res) => {
+  const csrfToken = issueCsrfToken(req, res);
+  res.json({ csrfToken });
+});
+
+// Require a valid CSRF token on state-changing requests (leaving GET/HEAD/OPTIONS
+// and pre-auth login/register routes exempt).
+app.use(csrfProtection);
+
 app.use('/api/auth', authRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/users', userRoutes);
@@ -34,7 +45,7 @@ app.use((req, res) => {
 // Error handler
 app.use((err, req, res, next) => {
   console.error(err);
-  res.status(err.status || 500).json({ message: err.message || 'Server Error' });
+  res.status(err.status || err.statusCode || 500).json({ message: err.message || 'Server Error' });
 });
 
 export default app;
