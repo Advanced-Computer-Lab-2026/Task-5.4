@@ -2,6 +2,7 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import Joi from 'joi';
 import { User } from '../models/User.js';
+import { setCsrfCookie } from '../middleware/csrf.js';
 
 // How long the auth cookie lives, in ms (mirrors JWT_EXPIRES_IN's default of 7d).
 const COOKIE_MAX_AGE = 7 * 24 * 60 * 60 * 1000;
@@ -37,6 +38,7 @@ export async function register(req, res, next) {
     const user = await User.create({ name: value.name, email: value.email, password });
     const token = signToken(user);
     setAuthCookie(res, token);
+    setCsrfCookie(res);
     res.status(201).json({ user: publicUser(user) });
   } catch (err) { next(err); }
 }
@@ -60,6 +62,7 @@ export async function login(req, res, next) {
 
     const token = signToken(user);
     setAuthCookie(res, token);
+    setCsrfCookie(res);
     res.json({ user: publicUser(user) });
   } catch (err) { next(err); }
 }
@@ -67,6 +70,7 @@ export async function login(req, res, next) {
 // POST /api/auth/logout
 export async function logout(req, res) {
   res.clearCookie('token');
+  res.clearCookie('csrfToken');
   res.json({ ok: true });
 }
 
