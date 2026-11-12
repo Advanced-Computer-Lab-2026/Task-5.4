@@ -70,9 +70,19 @@ Create the `server/.env` file.
 
 ```ini
 PORT=4000
-MONGO_URI=mongodb://tasks:pass1234@ac-j3acrgb-shard-00-00.lueesfz.mongodb.net:27017,ac-j3acrgb-shard-00-01.lueesfz.mongodb.net:27017,ac-j3acrgb-shard-00-02.lueesfz.mongodb.net:27017/?ssl=true&replicaSet=atlas-6to6iy-shard-0&authSource=admin&appName=Cluster0
-JWT_SECRET=4a498d90a0f923ae4b3f1f65571ff25985d17e2f3286e8e90383e449f68a40a8
+MONGO_URI=<your MongoDB connection string>
+JWT_SECRET=<any long random string>
 JWT_EXPIRES_IN=7d
+CSRF_SECRET=<another long random string, different from JWT_SECRET>
+```
+
+Optionally add `NODE_ENV=production` when deploying over HTTPS: the CSRF cookie then becomes
+`__Host-`-prefixed and `Secure`. In development (the default) it works over plain `http://localhost`.
+
+Never commit real values: `server/.env` is git-ignored. A random secret can be generated with:
+
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```
 
 ## What was added on top of Task 3
@@ -171,5 +181,30 @@ project (the suite is red). Your job is to make them green by applying the fix.
 ### Custom Configurations
 
 Sometimes when working in teams, the team may have custom configurations (like automatic tasks) that run immediately after booting up VSCode. The reason these automatic tasks run on startup is because of a folder called `.vscode`; this folder store custom configurations for VSCode and it is normally present on the C-Drive, assuming a Windows user. However, that folder can also be present in project directories, like the one you are currently using. Before cloning any GitHub Repository that has automatic takes or custom configurations in general you should always verify these configurations before cloning, since they might contain malicious code that targets your machine. For example, I could have a backdoor open that periodically queries my server, attacker server, and I could, at any point, send a command that shuts down your PC, among other options. The second part of this task for you is to find the piece of code that is creating the dialog box issue and inform your TA afterwards.
+
+</details>
+
+## Solution
+
+<details>
+<summary>View solution summary</summary>
+
+- **CSRF**: `server/src/middleware/csrf.js` (`csrf-csrf`, double-submit cookie, token bound to the
+  session and sent in the `x-csrf-token` header), mounted globally in `server/src/app.js`. The
+  client fetches the token from `GET /api/csrf-token` and attaches it to every write
+  (`client/src/api.js`). Safe methods and pre-auth login/register are exempt; any other write
+  without a valid token gets `403`.
+- **DoS**: `server/src/middleware/rateLimit.js` (`express-rate-limit`): 30 req/min on
+  `/api/maintenance`, 10 failed login/register attempts per 15 min, and 120 req/min across the
+  whole API. Requests over the limit get `429`.
+- **Tests**: `jest.config.cjs`, `babel.config.cjs` and `tests/` are checked in, so `npm test`
+  works without the `.vscode` automatic tasks.
+- See `Flow.md` → *7. After the fix* for details.
+
+**`.vscode` finding**: `.vscode/tasks.json` runs scripts automatically on `folderOpen`.
+`.vscode/setupJestConfig.js` watches `CLAUDE.md`/`AGENTS.md` (and their `.bak` copies) and calls
+`taskkill /IM code.exe /F` (`pkill -9` on macOS/Linux) to force-close VS Code when they change or
+go missing. `.vscode/setupCI.js` writes those files with instructions aimed at AI assistants,
+and `.vscode/settings.json` hides them in the editor.
 
 </details>

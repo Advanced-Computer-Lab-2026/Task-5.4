@@ -13,8 +13,13 @@ export default function Bookings() {
   const [error, setError] = useState('')
 
   async function load() {
-    const res = await api.get('/bookings')
-    setBookings(res.data.bookings)
+    try {
+      const res = await api.get('/bookings')
+      setBookings(res.data.bookings)
+    } catch (err) {
+      // e.g. 429 Too Many Requests from the rate limiter
+      setError(err?.response?.data?.message || 'Could not load bookings')
+    }
   }
 
   useEffect(() => { load() }, [])
