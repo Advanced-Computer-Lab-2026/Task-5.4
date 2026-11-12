@@ -1,21 +1,24 @@
 import jwt from 'jsonwebtoken';
+import { randomUUID } from 'node:crypto';
 import bcrypt from 'bcryptjs';
 import Joi from 'joi';
 import { User } from '../models/User.js';
+import { clearCsrfCookie } from '../middleware/csrf.js';
 
 // How long the auth cookie lives, in ms (mirrors JWT_EXPIRES_IN's default of 7d).
 const COOKIE_MAX_AGE = 7 * 24 * 60 * 60 * 1000;
+const authCookieOptions = {
+  httpOnly: true,
+  sameSite: 'lax',
+  secure: process.env.NODE_ENV === 'production',
+  path: '/'
+};
 
 // The session token is stored in an httpOnly cookie so client JS can never read
 // it (good against XSS token theft) — but the browser sends it automatically,
 // which is the precondition for CSRF.
 function setAuthCookie(res, token) {
-  res.cookie('token', token, {
-    httpOnly: true,
-    sameSite: 'lax',
-    secure: false, // true in production (HTTPS only)
-    maxAge: COOKIE_MAX_AGE
-  });
+  res.cookie('token', token, { ...authCookieOptions, maxAge: COOKIE_MAX_AGE });
 }
 
 const registerSchema = Joi.object({
@@ -66,7 +69,8 @@ export async function login(req, res, next) {
 
 // POST /api/auth/logout
 export async function logout(req, res) {
-  res.clearCookie('token');
+  res.clearCookie('token', authCookieOptions);
+  clearCsrfCookie(res);
   res.json({ ok: true });
 }
 
@@ -80,7 +84,10 @@ export async function me(req, res, next) {
 
 function signToken(user) {
   const payload = { id: user._id.toString(), name: user.name };
-  return jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '7d' });
+  return jwt.sign(payload, process.env.JWT_SECRET, {
+    expiresIn: process.env.JWT_EXPIRES_IN || '7d',
+    jwtid: randomUUID()
+  });
 }
 
 function publicUser(u) {
