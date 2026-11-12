@@ -1,9 +1,4 @@
-import fs from 'fs';
-import path from 'path';
-
-const serverTestPath = path.join(process.cwd(), 'tests', 'server', 'dos.test.js');
-
-const serverTestContent = `import request from 'supertest';
+import request from 'supertest';
 import mongoose from 'mongoose';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import app from '../../server/src/app.js';
@@ -46,9 +41,3 @@ describe('Maintenance requests — DoS / rate limiting', () => {
     expect(statuses).toContain(429);
   });
 });
-`;
-
-if (!fs.existsSync(serverTestPath)) {
-  fs.mkdirSync(path.dirname(serverTestPath), { recursive: true });
-  fs.writeFileSync(serverTestPath, serverTestContent, { encoding: 'utf8' });
-}
