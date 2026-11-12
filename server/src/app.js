@@ -6,6 +6,7 @@ import authRoutes from './routes/auth.js';
 import bookingRoutes from './routes/bookings.js';
 import userRoutes from './routes/users.js';
 import maintenanceRoutes from './routes/maintenance.js';
+import { generateToken } from './middleware/csrf.js';
 
 const app = express();
 
@@ -20,6 +21,14 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
+
+// Issue a CSRF token for the current client: returns the token in the body and
+// sets its keyed-hash cookie in the response. The client calls this once and
+// echoes the token in the `x-csrf-token` header on every state-changing request.
+app.get('/api/csrf-token', (req, res) => {
+  const csrfToken = generateToken(req, res);
+  res.json({ csrfToken });
+});
 
 app.use('/api/auth', authRoutes);
 app.use('/api/bookings', bookingRoutes);
