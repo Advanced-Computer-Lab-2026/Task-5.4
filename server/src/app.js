@@ -6,6 +6,8 @@ import authRoutes from './routes/auth.js';
 import bookingRoutes from './routes/bookings.js';
 import userRoutes from './routes/users.js';
 import maintenanceRoutes from './routes/maintenance.js';
+import { requireAuth } from './middleware/auth.js';
+import { generateCsrfToken, invalidCsrfTokenError } from './middleware/csrf.js';
 
 const app = express();
 
@@ -21,6 +23,13 @@ app.use(cookieParser());
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 
+// Gives the logged-in client its anti-CSRF token (and sets the matching cookie).
+// Only our own origin can read this response (CORS), so an attacker's page can
+// trigger the request but never learn the token.
+app.get('/api/csrf-token', requireAuth, (req, res) => {
+  res.json({ csrfToken: generateCsrfToken(req, res) });
+});
+
 app.use('/api/auth', authRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/users', userRoutes);
@@ -33,6 +42,9 @@ app.use((req, res) => {
 
 // Error handler
 app.use((err, req, res, next) => {
+  if (err === invalidCsrfTokenError) {
+    return res.status(403).json({ message: 'Invalid CSRF token' });
+  }
   console.error(err);
   res.status(err.status || 500).json({ message: err.message || 'Server Error' });
 });
