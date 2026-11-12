@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { requireAuth } from '../middleware/auth.js';
+import { authenticatedWrite } from '../middleware/csrf.js';
 import {
   getAllUsers,
   getUser,
@@ -12,7 +12,7 @@ const router = Router();
 // Creating a user is now done through POST /api/auth/register.
 router.get('/', getAllUsers);
 router.get('/:id', getUser);
-router.patch('/:id', requireAuth, updateUser);
-router.delete('/:id', requireAuth, deleteUser);
+router.patch('/:id', authenticatedWrite, updateUser);
+router.delete('/:id', authenticatedWrite, deleteUser);
 
 export default router;
