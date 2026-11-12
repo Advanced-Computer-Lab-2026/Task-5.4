@@ -83,13 +83,12 @@ It looks like a harmless "You won a prize!" page. But on load it **auto-submits 
 form** that POSTs to `http://localhost:4000/api/maintenance` with a forged request
 (`description=Forged by attacker via CSRF`), targeting a hidden iframe so you see nothing.
 
-Now go back to the app tab and **refresh the Maintenance page**. A request you never made —
-`Forged by attacker via CSRF` for room `Z9-666` — is now filed **in your name**. The server
-could not tell it apart from a real click.
+After applying the fix, the forged request should return **403 Forbidden** because the form
+cannot supply the required `x-csrf-token` header. Refresh the Maintenance page: no request for
+room `Z9-666` should appear.
 
-> Want to watch it happen? Open DevTools → **Network** on the attacker page before it loads,
-> and you will see the cross-site `POST` to `/api/maintenance` return `201`, with your
-> `token` cookie attached under **Request Headers → Cookie**.
+> Want to watch it happen? Open DevTools → **Network** on the attacker page before it loads.
+> The browser may attach the auth cookie, but the server should reject the POST with `403`.
 
 ---
 
@@ -99,22 +98,21 @@ Still on `http://localhost:1337`, click **"Claim my prize"**. The page fires **h
 `fetch` requests** at `http://localhost:4000/api/maintenance` straight from the victim's
 browser.
 
-Open DevTools → **Network** and watch: every request returns `200` and is served in full.
-There is nothing stopping one client (or a crowd of victims lured to this page) from
-hammering the API until it falls over. **No request is ever refused.**
+Open DevTools → **Network** and watch: initial requests succeed, then excess requests are
+refused with **429 Too Many Requests**. The limit is per client and resets after its time window.
 
 ---
 
-## 5. Why it works (the vulnerable code path)
+## 5. Why it worked before, and why the fix blocks it
 
 **CSRF**
 
-1. **Auth is a cookie the browser sends for you** — `server/src/middleware/auth.js` reads the
-   JWT from `req.cookies.token`. The victim's browser attaches it to the attacker's forged
-   request automatically; the server cannot tell the difference between that and a real click.
-2. **The write trusts the cookie alone** — `server/src/routes/maintenance.js` guards `POST /`
-   with only `requireAuth`. There is **no proof the request came from our own app**: no
-   anti-CSRF token.
+1. **Auth is still a cookie the browser sends for you** — `server/src/middleware/auth.js` reads
+   the JWT from `req.cookies.token`. The browser may attach it to the attacker's forged request;
+   before the fix, the server treated that cookie alone as sufficient proof of intent.
+2. **Writes require an additional proof** — the API issues a signed, session-bound CSRF token
+   through `GET /api/csrf-token` and requires it in the `x-csrf-token` header for
+   state-changing requests. Login and registration remain exempt because no session exists yet.
 3. **The body is a plain form** — `server/src/app.js` parses `urlencoded` bodies, so a bare
    HTML `<form>` POST (which needs no JavaScript and triggers no CORS preflight) is enough.
 4. **CORS does not save you.** CORS only blocks the attacker from *reading* the response; the
@@ -131,9 +129,8 @@ hammering the API until it falls over. **No request is ever refused.**
 
 **DoS**
 
-5. **No rate limiting** — `server/src/routes/maintenance.js` applies no limiter, so
-   `maintenanceController.getAllRequests` runs for *every* request, no matter how many arrive
-   from one client in how short a time. Each one hits the database.
+5. **Maintenance requests are rate-limited** — each client can make up to 30 requests per minute
+   across the maintenance endpoints; excess requests return `429`.
 
 The fixes: require a secret, per-session **CSRF token** on every state-changing request (a
 value the attacker's site cannot read or guess), and **rate-limit** the feature so a flood is
@@ -151,14 +148,13 @@ npm install     # first time only
 npm test
 ```
 
-What to expect **in this vulnerable project**:
+What to expect after the fixes:
 
 - The tests describe the **secure** behavior the feature *should* have: a forged request with
   no CSRF token is rejected (server), a flood is throttled to `429` (server), and the client
   attaches a CSRF token to mutating requests (client).
-- So here they are **expected to FAIL** (the suite is red). That red result is the starting
-  point — your job is to make them green by adding CSRF protection and rate limiting. The
-  solution project shows them all passing.
+- All three checks should pass: the server rejects forged writes, throttles floods, and the
+  client attaches the token header to mutating requests.
 
 Notes:
 
