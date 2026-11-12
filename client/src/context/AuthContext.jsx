@@ -29,7 +29,7 @@ export function AuthProvider({ children }) {
 
   const logout = useCallback(async () => {
     // Ask the server to clear the auth cookie, then reset local state.
-    try { await api.post('/auth/logout') } catch { /* ignore */ }
+    await api.post('/auth/logout')
     setUser(null)
     window.location.href = '/login'
   }, [])
