@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import Joi from 'joi';
@@ -79,7 +80,7 @@ export async function me(req, res, next) {
 }
 
 function signToken(user) {
-  const payload = { id: user._id.toString(), name: user.name };
+  const payload = { jti: randomUUID(), id: user._id.toString(), name: user.name };
   return jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '7d' });
 }
 

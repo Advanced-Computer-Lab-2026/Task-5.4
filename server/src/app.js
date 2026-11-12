@@ -1,3 +1,6 @@
+import { rateLimit } from 'express-rate-limit';
+import { requireAuth } from './middleware/auth.js';
+import { generateCsrfToken, doubleCsrfProtection } from './middleware/csrf.js';
 import express from 'express';
 import morgan from 'morgan';
 import cors from 'cors';
@@ -21,6 +24,16 @@ app.use(cookieParser());
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 
+app.get('/api/csrf-token', requireAuth, (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.json({ csrfToken: generateCsrfToken(req, res) });
+});
+app.use('/api/maintenance', rateLimit({ windowMs: 60_000, limit: 30, standardHeaders: 'draft-8', legacyHeaders: false }));
+app.use('/api', (req, res, next) => {
+  if (['GET', 'HEAD', 'OPTIONS'].includes(req.method) ||
+      (req.method === 'POST' && /^\/auth\/(login|register)\/?$/i.test(req.path))) return next();
+  return doubleCsrfProtection(req, res, next);
+});
 app.use('/api/auth', authRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/users', userRoutes);
