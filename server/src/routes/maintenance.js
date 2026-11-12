@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { requireAuth } from '../middleware/auth.js';
+import { maintenanceLimiter } from '../middleware/rateLimit.js';
 import {
   getAllRequests,
   getRequest,
@@ -12,14 +13,13 @@ const router = Router();
 
 // Reading is public; writing requires a logged-in user.
 //
-// VULNERABLE on two fronts:
-//   1. CSRF — the write routes trust the auth cookie alone. There is no
-//      anti-CSRF token, so any website the victim visits can forge a
-//      state-changing request in the victim's name (the browser attaches the
-//      cookie automatically).
-//   2. DoS — there is no rate limiting anywhere, so the public list endpoint
-//      (and the writes) can be flooded with unlimited requests to exhaust the
-//      server.
+// FIXED:
+//   1. CSRF — every write must carry a valid anti-CSRF token (enforced globally
+//      in app.js by the csrf-csrf middleware), so a forged cross-site request is
+//      rejected with 403 before it reaches these handlers.
+//   2. DoS — the whole feature is rate-limited per client; a flood gets 429.
+router.use(maintenanceLimiter);
+
 router.get('/', getAllRequests);
 router.get('/:id', getRequest);
 router.post('/', requireAuth, createRequest);
