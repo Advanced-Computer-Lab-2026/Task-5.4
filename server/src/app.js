@@ -6,6 +6,10 @@ import authRoutes from './routes/auth.js';
 import bookingRoutes from './routes/bookings.js';
 import userRoutes from './routes/users.js';
 import maintenanceRoutes from './routes/maintenance.js';
+import { login, register } from './controllers/authController.js';
+import { requireAuth } from './middleware/auth.js';
+import { doubleCsrfProtection, generateCsrfToken } from './middleware/csrf.js';
+import { maintenanceRateLimit } from './middleware/maintenanceRateLimit.js';
 
 const app = express();
 
@@ -20,6 +24,25 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
+
+// These routes establish a session, so they must precede CSRF enforcement.
+app.post('/api/auth/register', register);
+app.post('/api/auth/login', login);
+
+app.get('/api/csrf-token', requireAuth, (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.json({ csrfToken: generateCsrfToken(req, res) });
+});
+
+// Reject excess maintenance traffic before authentication and database work.
+app.use('/api/maintenance', maintenanceRateLimit);
+
+// Protect all API writes, including bookings, account changes, and logout.
+// Safe requests remain public where their individual routes allow it.
+app.use('/api', (req, res, next) => {
+  if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) return next();
+  return requireAuth(req, res, () => doubleCsrfProtection(req, res, next));
+});
 
 app.use('/api/auth', authRoutes);
 app.use('/api/bookings', bookingRoutes);

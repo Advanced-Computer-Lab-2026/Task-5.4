@@ -1,11 +1,10 @@
 import { Router } from 'express';
-import { register, login, logout, me } from '../controllers/authController.js';
+import { logout, me } from '../controllers/authController.js';
 import { requireAuth } from '../middleware/auth.js';
 
 const router = Router();
 
-router.post('/register', register);
-router.post('/login', login);
+// Login/register are mounted before global CSRF protection in app.js.
 router.post('/logout', logout);
 router.get('/me', requireAuth, me);
 

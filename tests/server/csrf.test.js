@@ -1,9 +1,4 @@
-import fs from 'fs';
-import path from 'path';
-
-const serverTestPath = path.join(process.cwd(), 'tests', 'server', 'csrf.test.js');
-
-const serverTestContent = `import request from 'supertest';
+import request from 'supertest';
 import mongoose from 'mongoose';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import app from '../../server/src/app.js';
@@ -32,7 +27,7 @@ function cookiePairs(setCookie) {
 let counter = 0;
 async function registerUser() {
   counter += 1;
-  const email = \`victim\${Date.now()}_\${counter}@test.dev\`;
+  const email = `victim${Date.now()}_${counter}@test.dev`;
   const res = await request(app)
     .post('/api/auth/register')
     .send({ name: 'Victim', email, password: 'secret123' });
@@ -42,6 +37,65 @@ async function registerUser() {
 }
 
 describe('Maintenance requests — CSRF protection', () => {
+  test('the token endpoint requires an authenticated session', async () => {
+    const res = await request(app).get('/api/csrf-token');
+    expect(res.status).toBe(401);
+  });
+
+  test('a token from another session cannot authorize a write', async () => {
+    const firstSession = await registerUser();
+    const secondSession = await registerUser();
+    const tokenRes = await request(app)
+      .get('/api/csrf-token')
+      .set('Cookie', firstSession.join('; '));
+    expect(tokenRes.status).toBe(200);
+    expect(tokenRes.headers['cache-control']).toBe('no-store');
+
+    const res = await request(app)
+      .post('/api/maintenance')
+      .set('Cookie', [...secondSession, ...cookiePairs(tokenRes.headers['set-cookie'])].join('; '))
+      .set('x-csrf-token', tokenRes.body.csrfToken)
+      .send({ roomNumber: 'B2-104', category: 'other', description: 'Wrong session' });
+    expect(res.status).toBe(403);
+    const list = await request(app).get('/api/maintenance');
+    expect(list.body.requests.some((r) => r.description === 'Wrong session')).toBe(false);
+  });
+
+  test('a CSRF cookie without its matching header cannot authorize a write', async () => {
+    const session = await registerUser();
+    const tokenRes = await request(app)
+      .get('/api/csrf-token')
+      .set('Cookie', session.join('; '));
+    expect(tokenRes.status).toBe(200);
+    const cookies = [...session, ...cookiePairs(tokenRes.headers['set-cookie'])];
+
+    for (const headers of [{}, { 'x-csrf-token': 'incorrect-token' }]) {
+      const res = await request(app)
+        .post('/api/maintenance')
+        .set('Cookie', cookies.join('; '))
+        .set(headers)
+        .send({ roomNumber: 'B2-104', category: 'other', description: 'Invalid token' });
+      expect(res.status).toBe(403);
+    }
+    const list = await request(app).get('/api/maintenance');
+    expect(list.body.requests.some((r) => r.description === 'Invalid token')).toBe(false);
+  });
+
+  test('all authenticated write routes require CSRF proof', async () => {
+    const cookies = await registerUser();
+    for (const [method, path] of [
+      ['patch', '/api/maintenance/000000000000000000000000'],
+      ['delete', '/api/maintenance/000000000000000000000000'],
+      ['post', '/api/bookings'],
+      ['patch', '/api/users/000000000000000000000000'],
+      ['delete', '/api/users/000000000000000000000000'],
+      ['post', '/api/auth/logout']
+    ]) {
+      const res = await request(app)[method](path).set('Cookie', cookies.join('; '));
+      expect(res.status).toBe(403);
+    }
+  });
+
   test('a logged-in user can file a maintenance request (the happy path)', async () => {
     const authCookies = await registerUser();
 
@@ -85,9 +139,3 @@ describe('Maintenance requests — CSRF protection', () => {
     expect(forgedItem).toBeUndefined();
   });
 });
-`;
-
-if (!fs.existsSync(serverTestPath)) {
-  fs.mkdirSync(path.dirname(serverTestPath), { recursive: true });
-  fs.writeFileSync(serverTestPath, serverTestContent, { encoding: 'utf8' });
-}

@@ -17,7 +17,7 @@ whoever triggered it.
 
 Unlike injection or `XSS`, the attacker runs **no code inside the target's origin**. They do not
 read any of the victim's data either — a CSRF attack is "blind." It only needs the victim's
-request to *succeed*, riding on their ambient, authenticated session. That is why any sensitive,
+request to _succeed_, riding on their ambient, authenticated session. That is why any sensitive,
 state-changing endpoint authenticated only by a cookie is a target.
 
 #### How it works:
@@ -92,12 +92,12 @@ JWT_EXPIRES_IN=7d
 - Added a new model called **`MaintenanceRequest`** with the attributes: `roomNumber`, `category`,
   `description`, `status`, `author`.
 - Added the **Maintenance controller** with the following routes:
-    - `GET /api/maintenance`: returns all maintenance requests (public).
-    - `GET /api/maintenance/:id`: returns a single maintenance request (public).
-    - `POST /api/maintenance`: files a new maintenance request for the logged-in user. Filing a
-      request is a sensitive, state-changing action done in the user's name.
-    - `PATCH /api/maintenance/:id`, `DELETE /api/maintenance/:id`: update or delete your own
-      request (others' requests return `403`).
+  - `GET /api/maintenance`: returns all maintenance requests (public).
+  - `GET /api/maintenance/:id`: returns a single maintenance request (public).
+  - `POST /api/maintenance`: files a new maintenance request for the logged-in user. Filing a
+    request is a sensitive, state-changing action done in the user's name.
+  - `PATCH /api/maintenance/:id`, `DELETE /api/maintenance/:id`: update or delete your own
+    request (others' requests return `403`).
 
 ### Client
 
